@@ -171,7 +171,7 @@ export class SkyOffice extends Room<OfficeState> {
     if (this.password) {
       const validPassword = await bcrypt.compare(options.password, this.password)
       if (!validPassword) {
-        throw new ServerError(403, 'Password is incorrect!')
+        throw new ServerError(403, 'Mot de passe incorrect !')
       }
     }
     return true

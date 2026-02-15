@@ -116,7 +116,8 @@ export default function HelperButtonGroup() {
   const roomId = useAppSelector((state) => state.room.roomId)
   const roomName = useAppSelector((state) => state.room.roomName)
   const roomDescription = useAppSelector((state) => state.room.roomDescription)
-  const playerCount = useAppSelector((state) => state.user.playerNameMap.size)
+  // +1 pour inclure le joueur local
+  const playerCount = useAppSelector((state) => state.user.playerNameMap.size) + 1
   const dispatch = useAppDispatch()
 
   return (

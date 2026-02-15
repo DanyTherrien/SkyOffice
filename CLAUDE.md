@@ -79,7 +79,7 @@ Voir `~/.claude/plans/replicated-growing-wigderson.md` pour le plan complet avec
 - Phase 1A: Nouvelle carte 6 zones + detection de zones ← COMPLETEE
 - Phase 1B: Branding Capturia + traduction francaise ← COMPLETEE
 - Phase 1C: Liste utilisateurs en ligne + roles + labels ← COMPLETEE
-- Phase 1D: Tests complets et polish ← EN COURS
+- Phase 1D: Tests complets et polish ← COMPLETEE
 - Phase 2: Deploiement (Fly.io + Vercel)
 - Phase 3: Fonctionnalites post-MVP
 

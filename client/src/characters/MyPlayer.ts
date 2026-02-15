@@ -14,7 +14,6 @@ import { pushPlayerJoinedMessage } from '../stores/ChatStore'
 import { ItemType } from '../../../types/Items'
 import { NavKeys } from '../../../types/KeyboardState'
 import { JoystickMovement } from '../components/Joystick'
-import { openURL } from '../utils/helpers'
 
 export default class MyPlayer extends Player {
   private playContainerBody: Phaser.Physics.Arcade.Body
@@ -70,9 +69,8 @@ export default class MyPlayer extends Player {
           whiteboard.openDialog(network)
           break
         case ItemType.VENDINGMACHINE:
-          // hacky and hard-coded, but leaving it as is for now
-          const url = 'https://www.buymeacoffee.com/skyoffice'
-          openURL(url)
+          // Afficher une bulle de dialogue amusante
+          this.updateDialogBubble('☕ Mmm, bon café !')
           break
       }
     }
@@ -120,7 +118,7 @@ export default class MyPlayer extends Player {
           })
           // set up new dialog as player sits down
           chairItem.clearDialogBox()
-          chairItem.setDialogBox('Press E to leave')
+          chairItem.setDialogBox('Appuie sur E pour quitter')
           this.chairOnSit = chairItem
           this.playerBehavior = PlayerBehavior.SITTING
           return

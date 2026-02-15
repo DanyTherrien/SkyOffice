@@ -104,7 +104,8 @@ export default function UserListPanel({ onClose }: UserListPanelProps) {
     playersByZone[zone].push({ id, name, role })
   })
 
-  const totalPlayers = playerNameMap.size
+  // +1 pour inclure le joueur local (qui n'est pas dans playerNameMap)
+  const totalPlayers = playerNameMap.size + 1
 
   return (
     <PanelWrapper>

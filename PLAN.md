@@ -3,9 +3,9 @@
 ---
 ## STATUT ACTUEL (mis a jour a chaque session)
 
-**Phase en cours**: Phase 1C COMPLETEE — Pret pour Phase 1D
-**Derniere action completee**: Phase 1C complete (liste utilisateurs en ligne groupes par zone, affichage role sur avatar, champ role dans LoginDialog, bouton Utilisateurs avec badge, UserListPanel, tracking zone/role dans Redux)
-**Prochaine action**: Phase 1D — Tests complets et polish
+**Phase en cours**: Phase 1D COMPLETEE — Pret pour Phase 2
+**Derniere action completee**: Phase 1D complete (audit de code, correction de 4 bugs, polish UI, nettoyage refs SkyOffice, build verifie 0 erreurs TS + Vite 865 modules)
+**Prochaine action**: Phase 2 — Deploiement en production (Fly.io + Vercel)
 **Repo**: https://github.com/DanyTherrien/SkyOffice (fork)
 **Branche**: `capturia/main`
 **Repertoire local**: `/Users/dany/Desktop/Reunions_Capturia`
@@ -21,7 +21,7 @@
 - [x] Phase 1A — Nouvelle carte et systeme de zones
 - [x] Phase 1B — Branding Capturia + francais
 - [x] Phase 1C — Liste utilisateurs en ligne + roles + labels
-- [ ] Phase 1D — Tests complets et polish
+- [x] Phase 1D — Tests complets et polish
 - [ ] Phase 2 — Deploiement en production
 - [ ] Phase 3 — Fonctionnalites post-MVP
 ---
