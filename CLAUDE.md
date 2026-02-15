@@ -80,14 +80,14 @@ Voir `~/.claude/plans/replicated-growing-wigderson.md` pour le plan complet avec
 - Phase 1B: Branding Capturia + traduction francaise ← COMPLETEE
 - Phase 1C: Liste utilisateurs en ligne + roles + labels ← COMPLETEE
 - Phase 1D: Tests complets et polish ← COMPLETEE
-- Phase 2: Deploiement (Fly.io + Vercel) ← CONFIG PRETE
+- Phase 2: Deploiement (Fly.io + Vercel) ← EN PRODUCTION
 - Phase 3: Fonctionnalites post-MVP
 
 ## Deploiement (Phase 2)
 
 ### Serveur (Fly.io)
 - `Dockerfile` — Image Docker du serveur (Node.js + ts-node + Colyseus)
-- `fly.toml` — Config Fly.io (region yul/Montreal, port 2567, health check /health)
+- `fly.toml` — Config Fly.io (region yyz/Toronto, port 2567, health check /health)
 - `.dockerignore` — Exclut le client (deploye separement)
 - Script `yarn start:prod` — Demarre le serveur en mode production
 - Deployer: `fly auth login && fly deploy`

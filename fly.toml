@@ -1,9 +1,9 @@
 # Configuration Fly.io pour le serveur Capturia Office
 # Deployer avec: fly deploy
-# Region: yul (Montreal)
+# Region: yyz (Toronto)
 
 app = 'capturia-office-server'
-primary_region = 'yul'
+primary_region = 'yyz'
 
 [build]
 
@@ -16,12 +16,8 @@ primary_region = 'yul'
   force_https = true
   auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 1
-
-  [http_service.concurrency]
-    type = 'connections'
-    hard_limit = 100
-    soft_limit = 80
+  min_machines_running = 0
+  processes = ['app']
 
   [[http_service.checks]]
     interval = '30s'
@@ -31,5 +27,6 @@ primary_region = 'yul'
     path = '/health'
 
 [[vm]]
-  size = 'shared-cpu-1x'
   memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

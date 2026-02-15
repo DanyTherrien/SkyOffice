@@ -3,9 +3,9 @@
 ---
 ## STATUT ACTUEL (mis a jour a chaque session)
 
-**Phase en cours**: Phase 2 COMPLETEE (config) — Pret pour deploiement
-**Derniere action completee**: Phase 2 config complete (Dockerfile, fly.toml, vercel.json, .env.production, endpoint /health, script start:prod, build verifie 0 erreurs TS + Vite 865 modules)
-**Prochaine action**: Deployer avec `fly deploy` (serveur) et `vercel --prod` (client)
+**Phase en cours**: Phase 2 COMPLETEE — En production
+**Derniere action completee**: Phase 2 complete (serveur Fly.io yyz, client Vercel, health check OK, 1 machine, env vars configurees)
+**Prochaine action**: Phase 3 — Fonctionnalites post-MVP
 **Repo**: https://github.com/DanyTherrien/SkyOffice (fork)
 **Branche**: `capturia/main`
 **Repertoire local**: `/Users/dany/Desktop/Reunions_Capturia`
@@ -22,7 +22,7 @@
 - [x] Phase 1B — Branding Capturia + francais
 - [x] Phase 1C — Liste utilisateurs en ligne + roles + labels
 - [x] Phase 1D — Tests complets et polish
-- [x] Phase 2 — Deploiement en production (config prete, deploiement a faire manuellement)
+- [x] Phase 2 — Deploiement en production (Fly.io yyz + Vercel — EN LIGNE)
 - [ ] Phase 3 — Fonctionnalites post-MVP
 ---
 
