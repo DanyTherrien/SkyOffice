@@ -14,7 +14,11 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
-// app.use(express.static('dist'))
+
+// Endpoint de sante pour les health checks (Fly.io)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok' })
+})
 
 const server = http.createServer(app)
 const gameServer = new Server({

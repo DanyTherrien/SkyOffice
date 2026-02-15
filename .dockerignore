@@ -1,0 +1,18 @@
+# Client (deploye separement sur Vercel)
+client/
+
+# Dependances (reinstallees dans le build Docker)
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Environnement local
+.env*
+.DS_Store
+.cache/
