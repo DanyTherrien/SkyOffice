@@ -99,7 +99,7 @@ const MessageWrapper = styled.div`
 
 const InputWrapper = styled.form`
   box-shadow: 10px 10px 10px #00000018;
-  border: 1px solid #42eacb;
+  border: 1px solid #14B8A6;
   border-radius: 0px 0px 10px 10px;
   display: flex;
   flex-direction: row;
@@ -119,7 +119,7 @@ const EmojiPickerWrapper = styled.div`
   right: 16px;
 `
 
-const dateFormatter = new Intl.DateTimeFormat('en', {
+const dateFormatter = new Intl.DateTimeFormat('fr-CA', {
   timeStyle: 'short',
   dateStyle: 'short',
 })
@@ -226,7 +226,7 @@ export default function Chat() {
         {showChat ? (
           <>
             <ChatHeader>
-              <h3>Chat</h3>
+              <h3>Clavardage</h3>
               <IconButton
                 aria-label="close dialog"
                 className="close"
@@ -262,7 +262,7 @@ export default function Chat() {
                 inputRef={inputRef}
                 autoFocus={focused}
                 fullWidth
-                placeholder="Press Enter to chat"
+                placeholder="Appuyez sur Entrée pour clavarder"
                 value={inputValue}
                 onKeyDown={handleKeyDown}
                 onChange={handleChange}

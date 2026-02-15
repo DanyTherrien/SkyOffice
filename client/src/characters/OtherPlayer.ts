@@ -32,6 +32,12 @@ export default class OtherPlayer extends Player {
   makeCall(myPlayer: MyPlayer, webRTC: WebRTC) {
     this.myPlayer = myPlayer
     const myPlayerId = myPlayer.playerId
+
+    // Pas d'appel automatique dans la zone Deep Work
+    if (myPlayer.currentZone === 'deep_work' || this.currentZone === 'deep_work') {
+      return
+    }
+
     if (
       !this.connected &&
       this.connectionBufferTime >= 750 &&
@@ -81,6 +87,18 @@ export default class OtherPlayer extends Player {
       case 'videoConnected':
         if (typeof value === 'boolean') {
           this.videoConnected = value
+        }
+        break
+
+      case 'zone':
+        if (typeof value === 'string') {
+          this.currentZone = value
+        }
+        break
+
+      case 'role':
+        if (typeof value === 'string') {
+          this.setPlayerRole(value)
         }
         break
     }
@@ -161,7 +179,10 @@ export default class OtherPlayer extends Player {
       this.body.touching.none &&
       this.connectionBufferTime >= 750
     ) {
-      if (this.x < 610 && this.y > 515 && this.myPlayer!.x < 610 && this.myPlayer!.y > 515) return
+      // Appel persistant dans les zones de reunion (pas de deconnexion quand on s'eloigne)
+      const persistentZones = ['cafe', 'war_room', 'sales']
+      const myZone = this.myPlayer?.currentZone
+      if (myZone && persistentZones.includes(myZone) && myZone === this.currentZone) return
       phaserEvents.emit(Event.PLAYER_DISCONNECTED, this.playerId)
       this.connectionBufferTime = 0
       this.connected = false

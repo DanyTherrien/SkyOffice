@@ -142,6 +142,7 @@ for (let i = avatars.length - 1; i > 0; i--) {
 
 export default function LoginDialog() {
   const [name, setName] = useState<string>('')
+  const [role, setRole] = useState<string>('')
   const [avatarIndex, setAvatarIndex] = useState<number>(0)
   const [nameFieldEmpty, setNameFieldEmpty] = useState<boolean>(false)
   const dispatch = useAppDispatch()
@@ -156,10 +157,14 @@ export default function LoginDialog() {
     if (name === '') {
       setNameFieldEmpty(true)
     } else if (roomJoined) {
-      console.log('Join! Name:', name, 'Avatar:', avatars[avatarIndex].name)
+      console.log('Join! Name:', name, 'Role:', role, 'Avatar:', avatars[avatarIndex].name)
       game.registerKeys()
       game.myPlayer.setPlayerName(name)
       game.myPlayer.setPlayerTexture(avatars[avatarIndex].name)
+      if (role) {
+        game.myPlayer.setPlayerRole(role)
+        game.network.updatePlayerRole(role)
+      }
       game.network.readyToConnect()
       dispatch(setLoggedIn(true))
     }
@@ -167,7 +172,7 @@ export default function LoginDialog() {
 
   return (
     <Wrapper onSubmit={handleSubmit}>
-      <Title>Joining</Title>
+      <Title>Connexion</Title>
       <RoomName>
         <Avatar style={{ background: getColorByString(roomName) }}>
           {getAvatarString(roomName)}
@@ -179,7 +184,7 @@ export default function LoginDialog() {
       </RoomDescription>
       <Content>
         <Left>
-          <SubTitle>Select an avatar</SubTitle>
+          <SubTitle>Choisir un avatar</SubTitle>
           <Swiper
             modules={[Navigation]}
             navigation
@@ -200,20 +205,31 @@ export default function LoginDialog() {
           <TextField
             autoFocus
             fullWidth
-            label="Name"
+            label="Nom"
             variant="outlined"
             color="secondary"
             error={nameFieldEmpty}
-            helperText={nameFieldEmpty && 'Name is required'}
+            helperText={nameFieldEmpty && 'Le nom est requis'}
             onInput={(e) => {
               setName((e.target as HTMLInputElement).value)
+            }}
+          />
+          <TextField
+            fullWidth
+            label="Rôle (optionnel)"
+            variant="outlined"
+            color="secondary"
+            sx={{ mt: 2 }}
+            placeholder="ex: Ventes, Dev, Direction"
+            onInput={(e) => {
+              setRole((e.target as HTMLInputElement).value)
             }}
           />
           {!videoConnected && (
             <Warning>
               <Alert variant="outlined" severity="warning">
-                <AlertTitle>Warning</AlertTitle>
-                No webcam/mic connected - <strong>connect one for best experience!</strong>
+                <AlertTitle>Attention</AlertTitle>
+                Aucune webcam/micro connecté — <strong>connectez-en pour une meilleure expérience !</strong>
               </Alert>
               <Button
                 variant="outlined"
@@ -222,21 +238,21 @@ export default function LoginDialog() {
                   game.network.webRTC?.getUserMedia()
                 }}
               >
-                Connect Webcam
+                Connecter la webcam
               </Button>
             </Warning>
           )}
 
           {videoConnected && (
             <Warning>
-              <Alert variant="outlined">Webcam connected!</Alert>
+              <Alert variant="outlined">Webcam connectée !</Alert>
             </Warning>
           )}
         </Right>
       </Content>
       <Bottom>
         <Button variant="contained" color="secondary" size="large" type="submit">
-          Join
+          Entrer
         </Button>
       </Bottom>
     </Wrapper>

@@ -1,18 +1,18 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
 import Fab from '@mui/material/Fab'
+import Badge from '@mui/material/Badge'
 import IconButton from '@mui/material/IconButton'
 import Avatar from '@mui/material/Avatar'
 import Tooltip from '@mui/material/Tooltip'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import ShareIcon from '@mui/icons-material/Share'
+import PeopleIcon from '@mui/icons-material/People'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import CloseIcon from '@mui/icons-material/Close'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import ArrowRightIcon from '@mui/icons-material/ArrowRight'
-import GitHubIcon from '@mui/icons-material/GitHub'
-import TwitterIcon from '@mui/icons-material/Twitter'
 import VideogameAssetIcon from '@mui/icons-material/VideogameAsset'
 import VideogameAssetOffIcon from '@mui/icons-material/VideogameAssetOff'
 
@@ -20,6 +20,7 @@ import { BackgroundMode } from '../../../types/BackgroundMode'
 import { setShowJoystick, toggleBackgroundMode } from '../stores/UserStore'
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { getAvatarString, getColorByString } from '../util'
+import UserListPanel from './UserListPanel'
 
 const Backdrop = styled.div`
   position: fixed;
@@ -108,19 +109,21 @@ const StyledFab = styled(Fab)<{ target?: string }>`
 export default function HelperButtonGroup() {
   const [showControlGuide, setShowControlGuide] = useState(false)
   const [showRoomInfo, setShowRoomInfo] = useState(false)
+  const [showUserList, setShowUserList] = useState(false)
   const showJoystick = useAppSelector((state) => state.user.showJoystick)
   const backgroundMode = useAppSelector((state) => state.user.backgroundMode)
   const roomJoined = useAppSelector((state) => state.room.roomJoined)
   const roomId = useAppSelector((state) => state.room.roomId)
   const roomName = useAppSelector((state) => state.room.roomName)
   const roomDescription = useAppSelector((state) => state.room.roomDescription)
+  const playerCount = useAppSelector((state) => state.user.playerNameMap.size)
   const dispatch = useAppDispatch()
 
   return (
     <Backdrop>
       <div className="wrapper-group">
         {roomJoined && (
-          <Tooltip title={showJoystick ? 'Disable virtual joystick' : 'Enable virtual joystick'}>
+          <Tooltip title={showJoystick ? 'Désactiver le joystick virtuel' : 'Activer le joystick virtuel'}>
             <StyledFab size="small" onClick={() => dispatch(setShowJoystick(!showJoystick))}>
               {showJoystick ? <VideogameAssetOffIcon /> : <VideogameAssetIcon />}
             </StyledFab>
@@ -145,36 +148,36 @@ export default function HelperButtonGroup() {
             </RoomDescription>
             <p className="tip">
               <LightbulbIcon />
-              Shareable link coming up 😄
+              Lien partageable bientôt disponible
             </p>
           </Wrapper>
         )}
         {showControlGuide && (
           <Wrapper>
-            <Title>Controls</Title>
+            <Title>Contrôles</Title>
             <IconButton className="close" onClick={() => setShowControlGuide(false)} size="small">
               <CloseIcon />
             </IconButton>
             <ul>
               <li>
-                <strong>W, A, S, D or arrow keys</strong> to move
+                <strong>W, A, S, D ou flèches</strong> pour se déplacer
               </li>
               <li>
-                <strong>E</strong> to sit down (when facing a chair)
+                <strong>E</strong> pour s'asseoir (face à une chaise)
               </li>
               <li>
-                <strong>R</strong> to use computer to screen share (when facing a computer)
+                <strong>R</strong> pour utiliser un ordinateur ou tableau (face à l'item)
               </li>
               <li>
-                <strong>Enter</strong> to open chat
+                <strong>Entrée</strong> pour ouvrir le clavardage
               </li>
               <li>
-                <strong>ESC</strong> to close chat
+                <strong>ESC</strong> pour fermer le clavardage
               </li>
             </ul>
             <p className="tip">
               <LightbulbIcon />
-              Video connection will start if you are close to someone else
+              L'appel vidéo démarre automatiquement quand vous êtes proche d'un collègue
             </p>
           </Wrapper>
         )}
@@ -182,23 +185,39 @@ export default function HelperButtonGroup() {
       <ButtonGroup>
         {roomJoined && (
           <>
-            <Tooltip title="Room Info">
+            <Tooltip title="Utilisateurs en ligne">
+              <StyledFab
+                size="small"
+                onClick={() => {
+                  setShowUserList(!showUserList)
+                  setShowRoomInfo(false)
+                  setShowControlGuide(false)
+                }}
+              >
+                <Badge badgeContent={playerCount} color="secondary" max={99}>
+                  <PeopleIcon />
+                </Badge>
+              </StyledFab>
+            </Tooltip>
+            <Tooltip title="Info salle">
               <StyledFab
                 size="small"
                 onClick={() => {
                   setShowRoomInfo(!showRoomInfo)
                   setShowControlGuide(false)
+                  setShowUserList(false)
                 }}
               >
                 <ShareIcon />
               </StyledFab>
             </Tooltip>
-            <Tooltip title="Control Guide">
+            <Tooltip title="Guide des contrôles">
               <StyledFab
                 size="small"
                 onClick={() => {
                   setShowControlGuide(!showControlGuide)
                   setShowRoomInfo(false)
+                  setShowUserList(false)
                 }}
               >
                 <HelpOutlineIcon />
@@ -206,26 +225,13 @@ export default function HelperButtonGroup() {
             </Tooltip>
           </>
         )}
-        <Tooltip title="Visit Our GitHub">
-          <StyledFab
-            size="small"
-            href="https://github.com/kevinshen56714/SkyOffice"
-            target="_blank"
-          >
-            <GitHubIcon />
-          </StyledFab>
-        </Tooltip>
-        <Tooltip title="Follow Us on Twitter">
-          <StyledFab size="small" href="https://twitter.com/SkyOfficeApp" target="_blank">
-            <TwitterIcon />
-          </StyledFab>
-        </Tooltip>
-        <Tooltip title="Switch Background Theme">
+        <Tooltip title="Changer le thème">
           <StyledFab size="small" onClick={() => dispatch(toggleBackgroundMode())}>
             {backgroundMode === BackgroundMode.DAY ? <DarkModeIcon /> : <LightModeIcon />}
           </StyledFab>
         </Tooltip>
       </ButtonGroup>
+      {showUserList && <UserListPanel onClose={() => setShowUserList(false)} />}
     </Backdrop>
   )
 }

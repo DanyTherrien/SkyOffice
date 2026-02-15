@@ -29,7 +29,7 @@ export const chatSlice = createSlice({
         chatMessage: {
           createdAt: new Date().getTime(),
           author: action.payload,
-          content: 'joined the lobby',
+          content: 'a rejoint le bureau',
         } as IChatMessage,
       })
     },
@@ -39,7 +39,7 @@ export const chatSlice = createSlice({
         chatMessage: {
           createdAt: new Date().getTime(),
           author: action.payload,
-          content: 'left the lobby',
+          content: 'a quitté le bureau',
         } as IChatMessage,
       })
     },

@@ -1,7 +1,7 @@
 {
-  "name": "skyoffice",
+  "name": "capturia-office-client",
   "private": true,
-  "description": "Client for SkyOffice",
+  "description": "Client pour le bureau virtuel Capturia",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",

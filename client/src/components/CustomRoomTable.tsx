@@ -122,7 +122,7 @@ export const CustomRoomTable = () => {
   }
 
   return availableRooms.length === 0 ? (
-    <MessageText>There are no custom rooms now, create one or join the public lobby.</MessageText>
+    <MessageText>Aucune salle personnalisée pour le moment. Créez-en une ou rejoignez le bureau principal.</MessageText>
   ) : (
     <>
       <CustomRoomTableContainer component={Paper}>
@@ -130,7 +130,7 @@ export const CustomRoomTable = () => {
           <TableHead>
             <TableRow>
               <TableCell></TableCell>
-              <TableCell>Name</TableCell>
+              <TableCell>Nom</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>ID</TableCell>
               <TableCell align="center">
@@ -159,7 +159,7 @@ export const CustomRoomTable = () => {
                   <TableCell>{roomId}</TableCell>
                   <TableCell align="center">{clients}</TableCell>
                   <TableCell align="center">
-                    <Tooltip title={hasPassword ? 'Password required' : ''}>
+                    <Tooltip title={hasPassword ? 'Mot de passe requis' : ''}>
                       <Button
                         variant="outlined"
                         color="secondary"
@@ -174,7 +174,7 @@ export const CustomRoomTable = () => {
                       >
                         <div className="join-wrapper">
                           {hasPassword && <LockIcon className="lock-icon" />}
-                          Join
+                          Rejoindre
                         </div>
                       </Button>
                     </Tooltip>
@@ -188,14 +188,14 @@ export const CustomRoomTable = () => {
       <PasswordDialog open={showPasswordDialog} onClose={resetPasswordDialog}>
         <form onSubmit={handlePasswordSubmit}>
           <DialogContent className="dialog-content">
-            <MessageText>This a private room, please enter password:</MessageText>
+            <MessageText>Cette salle est privée, veuillez entrer le mot de passe :</MessageText>
             <TextField
               autoFocus
               fullWidth
               error={passwordFieldEmpty}
-              helperText={passwordFieldEmpty && 'Required'}
+              helperText={passwordFieldEmpty && 'Requis'}
               value={password}
-              label="Password"
+              label="Mot de passe"
               type="password"
               variant="outlined"
               color="secondary"
@@ -205,16 +205,16 @@ export const CustomRoomTable = () => {
             />
             {showPasswordError && (
               <Alert severity="error" variant="outlined">
-                Incorrect Password!
+                Mot de passe incorrect !
               </Alert>
             )}
           </DialogContent>
           <DialogActions>
             <Button color="secondary" onClick={resetPasswordDialog}>
-              Cancel
+              Annuler
             </Button>
             <Button color="secondary" type="submit">
-              Join
+              Rejoindre
             </Button>
           </DialogActions>
         </form>

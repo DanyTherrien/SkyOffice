@@ -6,7 +6,15 @@ import { ItemType } from '../../../types/Items'
 import WebRTC from '../web/WebRTC'
 import { phaserEvents, Event } from '../events/EventCenter'
 import store from '../stores'
-import { setSessionId, setPlayerNameMap, removePlayerNameMap } from '../stores/UserStore'
+import {
+  setSessionId,
+  setPlayerNameMap,
+  removePlayerNameMap,
+  setPlayerZoneMap,
+  removePlayerZoneMap,
+  setPlayerRoleMap,
+  removePlayerRoleMap,
+} from '../stores/UserStore'
 import {
   setLobbyJoined,
   setJoinedRoomData,
@@ -114,6 +122,16 @@ export default class Network {
             store.dispatch(setPlayerNameMap({ id: key, name: value }))
             store.dispatch(pushPlayerJoinedMessage(value))
           }
+
+          // Dispatcher les changements de zone au Redux store
+          if (field === 'zone' && typeof value === 'string') {
+            store.dispatch(setPlayerZoneMap({ id: key, zone: value }))
+          }
+
+          // Dispatcher les changements de role au Redux store
+          if (field === 'role' && typeof value === 'string') {
+            store.dispatch(setPlayerRoleMap({ id: key, role: value }))
+          }
         })
       }
     }
@@ -125,6 +143,8 @@ export default class Network {
       this.webRTC?.deleteOnCalledVideoStream(key)
       store.dispatch(pushPlayerLeftMessage(player.name))
       store.dispatch(removePlayerNameMap(key))
+      store.dispatch(removePlayerZoneMap(key))
+      store.dispatch(removePlayerRoleMap(key))
     }
 
     // new instance added to the computers MapSchema
@@ -281,5 +301,15 @@ export default class Network {
 
   addChatMessage(content: string) {
     this.room?.send(Message.ADD_CHAT_MESSAGE, { content: content })
+  }
+
+  // Envoyer le changement de zone au serveur
+  updatePlayerZone(zone: string) {
+    this.room?.send(Message.UPDATE_PLAYER_ZONE, { zone })
+  }
+
+  // Envoyer le role du joueur au serveur
+  updatePlayerRole(role: string) {
+    this.room?.send(Message.UPDATE_PLAYER_ROLE, { role })
   }
 }

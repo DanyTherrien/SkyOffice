@@ -24,8 +24,8 @@ const gameServer = new Server({
 // register room handlers
 gameServer.define(RoomType.LOBBY, LobbyRoom)
 gameServer.define(RoomType.PUBLIC, SkyOffice, {
-  name: 'Public Lobby',
-  description: 'For making friends and familiarizing yourself with the controls',
+  name: 'Bureau Capturia',
+  description: 'Bureau virtuel de l\'équipe Capturia',
   password: null,
   autoDispose: false,
 })
@@ -43,4 +43,4 @@ gameServer.define(RoomType.CUSTOM, SkyOffice).enableRealtimeListing()
 app.use('/colyseus', monitor())
 
 gameServer.listen(port)
-console.log(`Listening on ws://localhost:${port}`)
+console.log(`Serveur Capturia démarré sur ws://localhost:${port}`)

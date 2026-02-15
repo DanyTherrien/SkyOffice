@@ -113,12 +113,12 @@ export default function ComputerDialog() {
               }
             }}
           >
-            {shareScreenManager?.myStream ? 'Stop sharing' : 'Share Screen'}
+            {shareScreenManager?.myStream ? 'Arrêter le partage' : 'Partager l\'écran'}
           </Button>
         </div>
 
         <VideoGrid>
-          {myStream && <VideoContainer stream={myStream} playerName="You" />}
+          {myStream && <VideoContainer stream={myStream} playerName="Vous" />}
 
           {[...peerStreams.entries()].map(([id, { stream }]) => {
             const playerName = playerNameMap.get(id)

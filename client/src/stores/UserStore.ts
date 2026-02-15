@@ -18,6 +18,8 @@ export const userSlice = createSlice({
     videoConnected: false,
     loggedIn: false,
     playerNameMap: new Map<string, string>(),
+    playerZoneMap: new Map<string, string>(),
+    playerRoleMap: new Map<string, string>(),
     showJoystick: window.innerWidth < 650,
   },
   reducers: {
@@ -44,6 +46,18 @@ export const userSlice = createSlice({
     removePlayerNameMap: (state, action: PayloadAction<string>) => {
       state.playerNameMap.delete(sanitizeId(action.payload))
     },
+    setPlayerZoneMap: (state, action: PayloadAction<{ id: string; zone: string }>) => {
+      state.playerZoneMap.set(sanitizeId(action.payload.id), action.payload.zone)
+    },
+    removePlayerZoneMap: (state, action: PayloadAction<string>) => {
+      state.playerZoneMap.delete(sanitizeId(action.payload))
+    },
+    setPlayerRoleMap: (state, action: PayloadAction<{ id: string; role: string }>) => {
+      state.playerRoleMap.set(sanitizeId(action.payload.id), action.payload.role)
+    },
+    removePlayerRoleMap: (state, action: PayloadAction<string>) => {
+      state.playerRoleMap.delete(sanitizeId(action.payload))
+    },
     setShowJoystick: (state, action: PayloadAction<boolean>) => {
       state.showJoystick = action.payload
     },
@@ -57,6 +71,10 @@ export const {
   setLoggedIn,
   setPlayerNameMap,
   removePlayerNameMap,
+  setPlayerZoneMap,
+  removePlayerZoneMap,
+  setPlayerRoleMap,
+  removePlayerRoleMap,
   setShowJoystick,
 } = userSlice.actions
 

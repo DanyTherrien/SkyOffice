@@ -39,13 +39,13 @@ export class SkyOffice extends Room<OfficeState> {
 
     this.setState(new OfficeState())
 
-    // HARD-CODED: Add 5 computers in a room
-    for (let i = 0; i < 5; i++) {
+    // 8 ordinateurs repartis dans les 6 zones
+    for (let i = 0; i < 8; i++) {
       this.state.computers.set(String(i), new Computer())
     }
 
-    // HARD-CODED: Add 3 whiteboards in a room
-    for (let i = 0; i < 3; i++) {
+    // 4 tableaux blancs repartis dans les zones
+    for (let i = 0; i < 4; i++) {
       this.state.whiteboards.set(String(i), new Whiteboard())
     }
 
@@ -136,6 +136,18 @@ export class SkyOffice extends Room<OfficeState> {
           cli.send(Message.DISCONNECT_STREAM, client.sessionId)
         }
       })
+    })
+
+    // quand un joueur change de zone
+    this.onMessage(Message.UPDATE_PLAYER_ZONE, (client, message: { zone: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (player) player.zone = message.zone
+    })
+
+    // quand un joueur met a jour son role
+    this.onMessage(Message.UPDATE_PLAYER_ROLE, (client, message: { role: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (player) player.role = message.role
     })
 
     // when a player send a chat message, update the message array and broadcast to all connected clients except the sender

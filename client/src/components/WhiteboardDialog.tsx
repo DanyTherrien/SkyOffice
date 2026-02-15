@@ -65,7 +65,7 @@ export default function WhiteboardDialog() {
         </IconButton>
         {whiteboardUrl && (
           <WhiteboardWrapper>
-            <iframe title="white board" src={whiteboardUrl} />
+            <iframe title="tableau blanc" src={whiteboardUrl} />
           </WhiteboardWrapper>
         )}
       </Wrapper>

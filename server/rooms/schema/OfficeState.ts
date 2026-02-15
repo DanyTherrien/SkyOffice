@@ -9,11 +9,13 @@ import {
 
 export class Player extends Schema implements IPlayer {
   @type('string') name = ''
-  @type('number') x = 705
-  @type('number') y = 500
+  @type('number') x = 320
+  @type('number') y = 320
   @type('string') anim = 'adam_idle_down'
   @type('boolean') readyToConnect = false
   @type('boolean') videoConnected = false
+  @type('string') zone = 'hall'
+  @type('string') role = ''
 }
 
 export class Computer extends Schema implements IComputer {

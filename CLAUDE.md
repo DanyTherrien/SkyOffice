@@ -33,8 +33,8 @@ Ouvrir http://localhost:5173
 - `characters/Player.ts` — Classe de base des joueurs
 - `services/Network.ts` — Client Colyseus (connexion, messages)
 - `web/WebRTC.ts` — Gestion des appels video PeerJS
-- `components/` — Composants React (UI overlay)
-- `stores/` — Redux stores (User, Chat, Room, Computer, Whiteboard)
+- `components/` — Composants React (UI overlay, dont UserListPanel)
+- `stores/` — Redux stores (User avec zone/role maps, Chat, Room, Computer, Whiteboard)
 - `items/` — Items interactifs (Chair, Computer, Whiteboard, VendingMachine)
 - `anims/CharacterAnims.ts` — Animations des avatars
 
@@ -75,11 +75,11 @@ Ouvrir http://localhost:5173
 Voir `~/.claude/plans/replicated-growing-wigderson.md` pour le plan complet avec toutes les phases.
 
 ### Phases
-- Phase 0: Initialisation (fork, clone, install) ← EN COURS
-- Phase 1A: Nouvelle carte 6 zones + detection de zones
-- Phase 1B: Branding Capturia + traduction francaise
-- Phase 1C: Liste utilisateurs en ligne + roles + labels
-- Phase 1D: Tests complets et polish
+- Phase 0: Initialisation (fork, clone, install) ← COMPLETEE
+- Phase 1A: Nouvelle carte 6 zones + detection de zones ← COMPLETEE
+- Phase 1B: Branding Capturia + traduction francaise ← COMPLETEE
+- Phase 1C: Liste utilisateurs en ligne + roles + labels ← COMPLETEE
+- Phase 1D: Tests complets et polish ← EN COURS
 - Phase 2: Deploiement (Fly.io + Vercel)
 - Phase 3: Fonctionnalites post-MVP
 

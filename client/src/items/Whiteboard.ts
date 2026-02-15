@@ -19,17 +19,17 @@ export default class Whiteboard extends Item {
     const numberOfUsers = this.currentUsers.size
     this.clearStatusBox()
     if (numberOfUsers === 1) {
-      this.setStatusBox(`${numberOfUsers} user`)
+      this.setStatusBox(`${numberOfUsers} utilisateur`)
     } else if (numberOfUsers > 1) {
-      this.setStatusBox(`${numberOfUsers} users`)
+      this.setStatusBox(`${numberOfUsers} utilisateurs`)
     }
   }
 
   onOverlapDialog() {
     if (this.currentUsers.size === 0) {
-      this.setDialogBox('Press R to use whiteboard')
+      this.setDialogBox('Appuie sur R pour utiliser le tableau')
     } else {
-      this.setDialogBox('Press R join')
+      this.setDialogBox('Appuie sur R pour rejoindre')
     }
   }
 

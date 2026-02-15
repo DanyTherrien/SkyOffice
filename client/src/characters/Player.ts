@@ -17,7 +17,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   playerBehavior = PlayerBehavior.IDLE
   readyToConnect = false
   videoConnected = false
+  currentZone: string = 'hall'
   playerName: Phaser.GameObjects.Text
+  playerRoleText: Phaser.GameObjects.Text
   playerContainer: Phaser.GameObjects.Container
   private playerDialogBubble: Phaser.GameObjects.Container
   private timeoutID?: number
@@ -53,12 +55,25 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       .setOrigin(0.5)
     this.playerContainer.add(this.playerName)
 
+    // Texte du role sous le nom
+    this.playerRoleText = this.scene.add
+      .text(0, 12, '')
+      .setFontFamily('Arial')
+      .setFontSize(10)
+      .setColor('#555555')
+      .setOrigin(0.5)
+    this.playerContainer.add(this.playerRoleText)
+
     this.scene.physics.world.enable(this.playerContainer)
     const playContainerBody = this.playerContainer.body as Phaser.Physics.Arcade.Body
     const collisionScale = [0.5, 0.2]
     playContainerBody
       .setSize(this.width * collisionScale[0], this.height * collisionScale[1])
       .setOffset(-8, this.height * (1 - collisionScale[1]) + 6)
+  }
+
+  setPlayerRole(role: string) {
+    this.playerRoleText.setText(role)
   }
 
   updateDialogBubble(content: string) {

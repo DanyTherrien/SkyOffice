@@ -4,10 +4,10 @@ const muiTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#426dea',
+      main: '#3B82F6',
     },
     secondary: {
-      main: '#42eacb',
+      main: '#14B8A6',
     },
   },
 })

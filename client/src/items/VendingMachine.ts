@@ -9,6 +9,6 @@ export default class VendingMachine extends Item {
   }
 
   onOverlapDialog() {
-    this.setDialogBox('Press R to buy a coffee :)')
+    this.setDialogBox('Appuie sur R pour prendre un café :)')
   }
 }
