@@ -15,9 +15,11 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import ArrowRightIcon from '@mui/icons-material/ArrowRight'
 import VideogameAssetIcon from '@mui/icons-material/VideogameAsset'
 import VideogameAssetOffIcon from '@mui/icons-material/VideogameAssetOff'
+import SettingsIcon from '@mui/icons-material/Settings'
 
 import { BackgroundMode } from '../../../types/BackgroundMode'
 import { setShowJoystick, toggleBackgroundMode } from '../stores/UserStore'
+import { openMediaSettings } from '../stores/MediaSettingsStore'
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { getAvatarString, getColorByString } from '../util'
 import UserListPanel from './UserListPanel'
@@ -161,24 +163,30 @@ export default function HelperButtonGroup() {
             </IconButton>
             <ul>
               <li>
-                <strong>W, A, S, D ou flèches</strong> pour se déplacer
+                <strong>W, A, S, D ou fleches</strong> — se deplacer
               </li>
               <li>
-                <strong>E</strong> pour s'asseoir (face à une chaise)
+                <strong>E</strong> — s'asseoir / se lever (face a une chaise)
               </li>
               <li>
-                <strong>R</strong> pour utiliser un ordinateur ou tableau (face à l'item)
+                <strong>R</strong> — utiliser un ordinateur ou tableau blanc
               </li>
               <li>
-                <strong>Entrée</strong> pour ouvrir le clavardage
+                <strong>M</strong> — rejoindre la reunion de zone
               </li>
               <li>
-                <strong>ESC</strong> pour fermer le clavardage
+                <strong>Entree</strong> — ouvrir le clavardage
+              </li>
+              <li>
+                <strong>ESC</strong> — fermer le clavardage
+              </li>
+              <li>
+                <strong>Molette</strong> ou <strong>+ / -</strong> — zoomer / dezoomer
               </li>
             </ul>
             <p className="tip">
               <LightbulbIcon />
-              L'appel vidéo démarre automatiquement quand vous êtes proche d'un collègue
+              Les zones de reunion activent l'appel video. Le Travail profond bloque les appels.
             </p>
           </Wrapper>
         )}
@@ -222,6 +230,19 @@ export default function HelperButtonGroup() {
                 }}
               >
                 <HelpOutlineIcon />
+              </StyledFab>
+            </Tooltip>
+            <Tooltip title="Parametres media">
+              <StyledFab
+                size="small"
+                onClick={() => {
+                  dispatch(openMediaSettings())
+                  setShowRoomInfo(false)
+                  setShowControlGuide(false)
+                  setShowUserList(false)
+                }}
+              >
+                <SettingsIcon />
               </StyledFab>
             </Tooltip>
           </>

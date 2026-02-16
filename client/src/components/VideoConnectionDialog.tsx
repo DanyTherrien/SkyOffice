@@ -1,11 +1,7 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
-import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import AlertTitle from '@mui/material/AlertTitle'
-
-import phaserGame from '../PhaserGame'
-import Game from '../scenes/Game'
 
 const Backdrop = styled.div`
   position: fixed;
@@ -35,20 +31,9 @@ export default function VideoConnectionDialog() {
             }}
           >
             <AlertTitle>Attention</AlertTitle>
-            Aucune webcam connectée
-            <br /> <strong>connectez-en une pour une meilleure expérience !</strong>
+            La webcam et le micro seront activés automatiquement en entrant dans une salle de réunion.
           </Alert>
         )}
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={() => {
-            const game = phaserGame.scene.keys.game as Game
-            game.network.webRTC?.getUserMedia()
-          }}
-        >
-          Connecter la webcam
-        </Button>
       </Wrapper>
     </Backdrop>
   )

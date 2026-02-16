@@ -17,12 +17,24 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   playerBehavior = PlayerBehavior.IDLE
   readyToConnect = false
   videoConnected = false
-  currentZone: string = 'hall'
+  currentZone = 'brainstorm'
   playerName: Phaser.GameObjects.Text
   playerRoleText: Phaser.GameObjects.Text
   playerContainer: Phaser.GameObjects.Container
+  private playerNameBg: Phaser.GameObjects.Graphics
   private playerDialogBubble: Phaser.GameObjects.Container
   private timeoutID?: number
+
+  // Indicateurs visuels de statut
+  private playerStatusDot: Phaser.GameObjects.Graphics
+  private playerMeetingIcon: Phaser.GameObjects.Text
+  private currentStatus = ''
+  private isInMyMeeting = false
+
+  // Indicateur de parole (cercle pulsant autour du sprite)
+  private speakingIndicator: Phaser.GameObjects.Graphics
+  private isSpeakingNow = false
+  private speakingPulsePhase = 0
 
   constructor(
     scene: Phaser.Scene,
@@ -46,12 +58,16 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.playerDialogBubble = this.scene.add.container(0, 0).setDepth(5000)
     this.playerContainer.add(this.playerDialogBubble)
 
+    // Fond semi-transparent derriere le nom (ajoute avant le texte pour le z-order)
+    this.playerNameBg = this.scene.add.graphics()
+    this.playerContainer.add(this.playerNameBg)
+
     // add playerName to playerContainer
     this.playerName = this.scene.add
       .text(0, 0, '')
       .setFontFamily('Arial')
       .setFontSize(12)
-      .setColor('#000000')
+      .setColor('#ffffff')
       .setOrigin(0.5)
     this.playerContainer.add(this.playerName)
 
@@ -60,9 +76,25 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       .text(0, 12, '')
       .setFontFamily('Arial')
       .setFontSize(10)
-      .setColor('#555555')
+      .setColor('#aaaaaa')
       .setOrigin(0.5)
     this.playerContainer.add(this.playerRoleText)
+
+    // Point de statut colore (vert/orange/rouge) a gauche du nom
+    this.playerStatusDot = this.scene.add.graphics()
+    this.playerContainer.add(this.playerStatusDot)
+
+    // Icone camera au-dessus du nom (visible si le joueur est dans la meme reunion)
+    this.playerMeetingIcon = this.scene.add
+      .text(0, -18, '📷')
+      .setFontSize(14)
+      .setOrigin(0.5)
+      .setVisible(false)
+    this.playerContainer.add(this.playerMeetingIcon)
+
+    // Cercle pulsant pour indiquer la parole active
+    this.speakingIndicator = this.scene.add.graphics()
+    this.speakingIndicator.setVisible(false)
 
     this.scene.physics.world.enable(this.playerContainer)
     const playContainerBody = this.playerContainer.body as Phaser.Physics.Arcade.Body
@@ -74,6 +106,23 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
   setPlayerRole(role: string) {
     this.playerRoleText.setText(role)
+  }
+
+  /** Met a jour le fond semi-transparent derriere le nom du joueur */
+  protected updateNameBackground() {
+    this.playerNameBg.clear()
+    if (!this.playerName.text) return
+    const padding = 6
+    const w = this.playerName.width + padding * 2
+    const h = this.playerName.height + 4
+    this.playerNameBg.fillStyle(0x000000, 0.5)
+    this.playerNameBg.fillRoundedRect(-w / 2, -h / 2, w, h, 4)
+    // Repositionner le dot de statut (la largeur du nom a pu changer)
+    if (this.currentStatus) {
+      const saved = this.currentStatus
+      this.currentStatus = '' // forcer le redraw
+      this.updateStatusDot(saved)
+    }
   }
 
   updateDialogBubble(content: string) {
@@ -118,5 +167,54 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   private clearDialogBubble() {
     clearTimeout(this.timeoutID)
     this.playerDialogBubble.removeAll(true)
+  }
+
+  /** Met a jour le point de statut colore a gauche du nom */
+  updateStatusDot(status: string) {
+    if (this.currentStatus === status) return
+    this.currentStatus = status
+
+    this.playerStatusDot.clear()
+
+    let color = 0x4ade80 // vert = disponible
+    if (status === 'meeting') color = 0xf59e0b // orange
+    else if (status === 'dnd') color = 0xef4444 // rouge
+
+    // Positionne le dot 12px a gauche du texte du nom
+    const dotX = -this.playerName.width / 2 - 12
+    this.playerStatusDot.fillStyle(color, 1.0)
+    this.playerStatusDot.fillCircle(dotX, 0, 4)
+  }
+
+  /** Affiche ou cache l'icone camera (collegue dans la meme reunion) */
+  updateMeetingIcon(visible: boolean) {
+    if (this.isInMyMeeting === visible) return
+    this.isInMyMeeting = visible
+    this.playerMeetingIcon.setVisible(visible)
+  }
+
+  /** Met a jour l'indicateur de parole (cercle pulsant vert autour du sprite) */
+  updateSpeakingIndicator(speaking: boolean) {
+    if (this.isSpeakingNow === speaking) return
+    this.isSpeakingNow = speaking
+    this.speakingIndicator.setVisible(speaking)
+    if (!speaking) {
+      this.speakingIndicator.clear()
+      this.speakingPulsePhase = 0
+    }
+  }
+
+  /** Appelée a chaque frame pour animer le cercle pulsant */
+  updateSpeakingPulse() {
+    if (!this.isSpeakingNow) return
+
+    this.speakingPulsePhase += 0.08
+    const alpha = 0.3 + 0.2 * Math.sin(this.speakingPulsePhase)
+    const radius = 14 + 2 * Math.sin(this.speakingPulsePhase)
+
+    this.speakingIndicator.clear()
+    this.speakingIndicator.lineStyle(2, 0x14b8a6, alpha)
+    this.speakingIndicator.strokeCircle(this.x, this.y - 4, radius)
+    this.speakingIndicator.setDepth(this.depth - 1)
   }
 }

@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import Network from '../services/Network'
 import { BackgroundMode } from '../../../types/BackgroundMode'
+import { AVATARS } from '../characters/avatarConfig'
 import store from '../stores'
 import { setRoomJoined } from '../stores/RoomStore'
 
@@ -60,22 +61,13 @@ export default class Bootstrap extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32,
     })
-    this.load.spritesheet('adam', 'assets/character/adam.png', {
-      frameWidth: 32,
-      frameHeight: 48,
-    })
-    this.load.spritesheet('ash', 'assets/character/ash.png', {
-      frameWidth: 32,
-      frameHeight: 48,
-    })
-    this.load.spritesheet('lucy', 'assets/character/lucy.png', {
-      frameWidth: 32,
-      frameHeight: 48,
-    })
-    this.load.spritesheet('nancy', 'assets/character/nancy.png', {
-      frameWidth: 32,
-      frameHeight: 48,
-    })
+    // Charger tous les avatars du registre
+    for (const avatar of AVATARS) {
+      this.load.spritesheet(avatar.name, `assets/character/${avatar.name}.png`, {
+        frameWidth: 32,
+        frameHeight: 48,
+      })
+    }
 
     this.load.on('complete', () => {
       this.preloadComplete = true
@@ -93,7 +85,6 @@ export default class Bootstrap extends Phaser.Scene {
 
   launchGame() {
     if (!this.preloadComplete) return
-    this.network.webRTC?.checkPreviousPermission()
     this.scene.launch('game', {
       network: this.network,
     })

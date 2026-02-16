@@ -20,17 +20,20 @@ import { ItemType } from '../../../types/Items'
 
 import store from '../stores'
 import { setFocused, setShowChat } from '../stores/ChatStore'
+import {
+  setShowMeetingPreview,
+  setPendingZone,
+  setShowZoneEntryBanner,
+  setBannerZoneName,
+} from '../stores/MeetingStore'
 import { NavKeys, Keyboard } from '../../../types/KeyboardState'
+import { sanitizeId } from '../util'
+import { ZONE_NAMES, MEETING_ZONES } from '../constants'
 
-// Noms francais des zones pour les labels sur la carte
-const zoneNames: Record<string, string> = {
-  hall: "Hall d'entree",
-  sales: 'Salle de ventes',
-  deep_work: 'Travail profond',
-  brainstorm: 'Remue-meninges',
-  cafe: 'Cafe / Pause',
-  war_room: 'Salle de strategie',
-}
+// Limites du zoom camera (ajuste pour la carte compacte 24x18)
+const MIN_ZOOM = 1.5
+const MAX_ZOOM = 3.5
+const ZOOM_STEP = 0.25
 
 export default class Game extends Phaser.Scene {
   network!: Network
@@ -47,7 +50,12 @@ export default class Game extends Phaser.Scene {
 
   // Detection de zones
   private zones: Map<string, Phaser.Geom.Rectangle> = new Map()
-  private currentZone: string = 'hall'
+  private currentZone = ''
+
+  // Grace period et banniere d'entree en zone de reunion
+  private keyM!: Phaser.Input.Keyboard.Key
+  private zoneEntryTimer: ReturnType<typeof setTimeout> | null = null
+  private bannerAutoHideTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor() {
     super('game')
@@ -62,6 +70,7 @@ export default class Game extends Phaser.Scene {
     // maybe we can have a dedicated method for adding keys if more keys are needed in the future
     this.keyE = this.input.keyboard.addKey('E')
     this.keyR = this.input.keyboard.addKey('R')
+    this.keyM = this.input.keyboard.addKey('M')
     this.input.keyboard.disableGlobalCapture()
     this.input.keyboard.on('keydown-ENTER', (event) => {
       store.dispatch(setShowChat(true))
@@ -97,16 +106,15 @@ export default class Game extends Phaser.Scene {
 
     // debugDraw(groundLayer, this)
 
-    // Spawn au centre du Hall d'entree
-    this.myPlayer = this.add.myPlayer(320, 320, 'adam', this.network.mySessionId)
+    // Spawn au centre du carrefour (carte compacte 24x18, centre a tile 12,9)
+    this.myPlayer = this.add.myPlayer(384, 288, 'adam', this.network.mySessionId)
     this.playerSelector = new PlayerSelector(this, 0, 0, 16, 16)
 
     // Charger les zones depuis le layer Zone de la tilemap
     const zoneLayer = this.map.getObjectLayer('Zone')
     if (zoneLayer) {
       zoneLayer.objects.forEach((zoneObj) => {
-        const zoneName =
-          zoneObj.properties?.find((p: any) => p.name === 'zoneName')?.value || 'unknown'
+        const zoneName = zoneObj.name || 'unknown'
         this.zones.set(
           zoneName,
           new Phaser.Geom.Rectangle(zoneObj.x!, zoneObj.y!, zoneObj.width!, zoneObj.height!)
@@ -116,10 +124,10 @@ export default class Game extends Phaser.Scene {
 
     // Afficher les labels de zones sur la carte
     for (const [name, rect] of this.zones) {
-      const label = zoneNames[name] || name
+      const label = ZONE_NAMES[name] || name
       this.add
-        .text(rect.x + rect.width / 2, rect.y + 20, label, {
-          fontSize: '16px',
+        .text(rect.x + rect.width / 2, rect.y + 16, label, {
+          fontSize: '14px',
           color: '#ffffff',
           fontFamily: 'Arial',
           fontStyle: 'bold',
@@ -189,8 +197,31 @@ export default class Game extends Phaser.Scene {
 
     this.otherPlayers = this.physics.add.group({ classType: OtherPlayer })
 
-    this.cameras.main.zoom = 1.5
+    this.cameras.main.zoom = 2.0
     this.cameras.main.startFollow(this.myPlayer, true)
+
+    // Limiter la camera aux bords de la carte
+    const mapWidth = this.map.widthInPixels
+    const mapHeight = this.map.heightInPixels
+    this.cameras.main.setBounds(0, 0, mapWidth, mapHeight)
+
+    // Zoom molette de souris
+    this.input.on('wheel', (_pointer: any, _gameObjects: any, _dx: number, dy: number) => {
+      const cam = this.cameras.main
+      if (dy > 0) {
+        cam.zoom = Math.max(MIN_ZOOM, cam.zoom - ZOOM_STEP)
+      } else if (dy < 0) {
+        cam.zoom = Math.min(MAX_ZOOM, cam.zoom + ZOOM_STEP)
+      }
+    })
+
+    // Zoom clavier +/-
+    this.input.keyboard.on('keydown-PLUS', () => {
+      this.cameras.main.zoom = Math.min(MAX_ZOOM, this.cameras.main.zoom + ZOOM_STEP)
+    })
+    this.input.keyboard.on('keydown-MINUS', () => {
+      this.cameras.main.zoom = Math.max(MIN_ZOOM, this.cameras.main.zoom - ZOOM_STEP)
+    })
 
     this.physics.add.collider([this.myPlayer, this.myPlayer.playerContainer], groundLayer)
     this.physics.add.collider([this.myPlayer, this.myPlayer.playerContainer], vendingMachines)
@@ -199,14 +230,6 @@ export default class Game extends Phaser.Scene {
       this.playerSelector,
       [chairs, computers, whiteboards, vendingMachines],
       this.handleItemSelectorOverlap,
-      undefined,
-      this
-    )
-
-    this.physics.add.overlap(
-      this.myPlayer,
-      this.otherPlayers,
-      this.handlePlayersOverlap,
       undefined,
       this
     )
@@ -304,10 +327,6 @@ export default class Game extends Phaser.Scene {
     otherPlayer?.updateOtherPlayer(field, value)
   }
 
-  private handlePlayersOverlap(myPlayer, otherPlayer) {
-    otherPlayer.makeCall(myPlayer, this.network?.webRTC)
-  }
-
   private handleItemUserAdded(playerId: string, itemId: string, itemType: ItemType) {
     if (itemType === ItemType.COMPUTER) {
       const computer = this.computerMap.get(itemId)
@@ -333,8 +352,66 @@ export default class Game extends Phaser.Scene {
     otherPlayer?.updateDialogBubble(content)
   }
 
+  // ─── Grace period et banniere d'entree en zone de reunion ──────────────
+
+  /** Demarre un timer de 1.5s : si le joueur reste dans la zone, affiche la banniere */
+  private startZoneEntryGracePeriod(zoneName: string): void {
+    this.clearZoneEntryTimer()
+    this.zoneEntryTimer = setTimeout(() => {
+      this.zoneEntryTimer = null
+      store.dispatch(setBannerZoneName(zoneName))
+      store.dispatch(setShowZoneEntryBanner(true))
+      // Auto-hide apres 8s
+      this.bannerAutoHideTimer = setTimeout(() => {
+        this.hideBanner()
+      }, 8000)
+    }, 1500)
+  }
+
+  /** Annule le timer de grace period */
+  private clearZoneEntryTimer(): void {
+    if (this.zoneEntryTimer) {
+      clearTimeout(this.zoneEntryTimer)
+      this.zoneEntryTimer = null
+    }
+  }
+
+  /** Cache la banniere et annule le timer d'auto-hide */
+  private hideBanner(): void {
+    const s = store.getState().meeting
+    if (s.showZoneEntryBanner) {
+      store.dispatch(setShowZoneEntryBanner(false))
+    }
+    if (this.bannerAutoHideTimer) {
+      clearTimeout(this.bannerAutoHideTimer)
+      this.bannerAutoHideTimer = null
+    }
+  }
+
+  /** Gere l'appui sur la touche M : ouvre le preview de reunion */
+  private handleMKeyPress(): void {
+    const meetingState = store.getState().meeting
+    const chatState = store.getState().chat
+
+    // Ne pas interferer avec le chat
+    if (chatState.focused) return
+    // Deja en reunion
+    if (meetingState.activeZone) return
+
+    const isMeetingZone = (MEETING_ZONES as readonly string[]).includes(this.currentZone)
+
+    if (meetingState.showZoneEntryBanner || isMeetingZone) {
+      this.clearZoneEntryTimer()
+      this.hideBanner()
+      store.dispatch(setPendingZone(meetingState.bannerZoneName || this.currentZone))
+      store.dispatch(setShowMeetingPreview(true))
+    }
+  }
+
   update(t: number, dt: number) {
     if (this.myPlayer && this.network) {
+      // Ne rien faire si les touches ne sont pas encore enregistrees (avant login)
+      if (!this.cursors) return
       this.playerSelector.update(this.myPlayer, this.cursors)
       this.myPlayer.update(this.playerSelector, this.cursors, this.keyE, this.keyR, this.network)
 
@@ -345,10 +422,60 @@ export default class Game extends Phaser.Scene {
             this.currentZone = name
             this.myPlayer.currentZone = name
             this.network.updatePlayerZone(name)
-            console.log(`[Capturia] Zone changee: ${zoneNames[name] || name}`)
+            // Mettre a jour le statut de presence selon la zone
+            if (name === 'deep_work') {
+              this.network.updatePlayerStatus('dnd')
+            } else if (name === 'meeting' || name === 'sales') {
+              this.network.updatePlayerStatus('meeting')
+            } else {
+              this.network.updatePlayerStatus('available')
+            }
+            console.log(`[Capturia] Zone changee: ${ZONE_NAMES[name] || name}`)
+
+            // Declencher join/leave de la reunion de zone
+            this.clearZoneEntryTimer()
+            this.hideBanner()
+
+            if (name === 'deep_work') {
+              this.network.zoneMeetingManager?.leaveZone()
+            } else {
+              // Si deja en meeting actif, changer de zone directement
+              const meetingState = store.getState().meeting
+              if (meetingState.activeZone) {
+                this.network.zoneMeetingManager?.joinZone(name)
+              } else {
+                // Grace period de 1.5s avant d'afficher la banniere
+                this.startZoneEntryGracePeriod(name)
+              }
+            }
           }
           break
         }
+      }
+
+      // Touche M : ouvrir le preview de reunion si dans une zone de reunion
+      if (Phaser.Input.Keyboard.JustDown(this.keyM)) {
+        this.handleMKeyPress()
+      }
+
+      // Mise a jour des indicateurs de statut sur les avatars
+      const userState = store.getState().user
+      const meetingState = store.getState().meeting
+
+      const myId = sanitizeId(this.network.mySessionId)
+      this.myPlayer.updateStatusDot(userState.playerStatusMap.get(myId) || 'available')
+      this.myPlayer.updateMeetingIcon(false)
+
+      for (const [sessionId, otherPlayer] of this.otherPlayerMap) {
+        const sid = sanitizeId(sessionId)
+        otherPlayer.updateStatusDot(userState.playerStatusMap.get(sid) || 'available')
+        const inMyMeeting =
+          meetingState.activeZone !== null && meetingState.zoneMemberIds.includes(sid)
+        otherPlayer.updateMeetingIcon(inMyMeeting)
+        // Indicateur de parole (cercle pulsant)
+        const isSpeaking = meetingState.speakingPeerIds.has(sid)
+        otherPlayer.updateSpeakingIndicator(isSpeaking)
+        otherPlayer.updateSpeakingPulse()
       }
     }
   }

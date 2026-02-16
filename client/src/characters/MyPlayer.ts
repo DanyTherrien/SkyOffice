@@ -33,6 +33,8 @@ export default class MyPlayer extends Player {
 
   setPlayerName(name: string) {
     this.playerName.setText(name)
+    this.updateNameBackground()
+    this.updateStatusDot('available')
     phaserEvents.emit(Event.MY_PLAYER_NAME_CHANGE, name)
     store.dispatch(pushPlayerJoinedMessage(name))
   }
@@ -60,14 +62,16 @@ export default class MyPlayer extends Player {
 
     if (Phaser.Input.Keyboard.JustDown(keyR)) {
       switch (item?.itemType) {
-        case ItemType.COMPUTER:
+        case ItemType.COMPUTER: {
           const computer = item as Computer
           computer.openDialog(this.playerId, network)
           break
-        case ItemType.WHITEBOARD:
+        }
+        case ItemType.WHITEBOARD: {
           const whiteboard = item as Whiteboard
           whiteboard.openDialog(network)
           break
+        }
         case ItemType.VENDINGMACHINE:
           // Afficher une bulle de dialogue amusante
           this.updateDialogBubble('☕ Mmm, bon café !')
@@ -76,7 +80,7 @@ export default class MyPlayer extends Player {
     }
 
     switch (this.playerBehavior) {
-      case PlayerBehavior.IDLE:
+      case PlayerBehavior.IDLE: {
         // if press E in front of selected chair
         if (Phaser.Input.Keyboard.JustDown(keyE) && item?.itemType === ItemType.CHAIR) {
           const chairItem = item as Chair
@@ -124,7 +128,7 @@ export default class MyPlayer extends Player {
           return
         }
 
-        const speed = 200
+        const speed = 250
         let vx = 0
         let vy = 0
 
@@ -179,6 +183,7 @@ export default class MyPlayer extends Player {
           }
         }
         break
+      }
 
       case PlayerBehavior.SITTING:
         // back to idle if player press E while sitting

@@ -12,10 +12,7 @@ import { Navigation } from 'swiper'
 import 'swiper/css'
 import 'swiper/css/navigation'
 
-import Adam from '../images/login/Adam_login.png'
-import Ash from '../images/login/Ash_login.png'
-import Lucy from '../images/login/Lucy_login.png'
-import Nancy from '../images/login/Nancy_login.png'
+import { AVATARS } from '../characters/avatarConfig'
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { setLoggedIn } from '../stores/UserStore'
 import { getAvatarString, getColorByString } from '../util'
@@ -97,15 +94,10 @@ const Left = styled.div`
     height: 220px;
     background: #dbdbe0;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-  }
-
-  .swiper-slide img {
-    display: block;
-    width: 95px;
-    height: 136px;
-    object-fit: contain;
+    gap: 12px;
   }
 `
 
@@ -127,17 +119,29 @@ const Warning = styled.div`
   gap: 3px;
 `
 
-const avatars = [
-  { name: 'adam', img: Adam },
-  { name: 'ash', img: Ash },
-  { name: 'lucy', img: Lucy },
-  { name: 'nancy', img: Nancy },
-]
+/** Affiche le frame idle_down (frame 18) du spritesheet en pixel art agrandi */
+const SpritePreview = styled.div<{ $avatarName: string }>`
+  width: 32px;
+  height: 48px;
+  background-image: url(${(props) => `assets/character/${props.$avatarName}.png`});
+  background-position: -576px 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  transform: scale(3);
+`
 
-// shuffle the avatars array
-for (let i = avatars.length - 1; i > 0; i--) {
+const AvatarLabel = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  margin-top: 24px;
+`
+
+// Melanger les avatars a chaque chargement
+const shuffledAvatars = [...AVATARS]
+for (let i = shuffledAvatars.length - 1; i > 0; i--) {
   const j = Math.floor(Math.random() * (i + 1))
-  ;[avatars[i], avatars[j]] = [avatars[j], avatars[i]]
+  ;[shuffledAvatars[i], shuffledAvatars[j]] = [shuffledAvatars[j], shuffledAvatars[i]]
 }
 
 export default function LoginDialog() {
@@ -157,10 +161,10 @@ export default function LoginDialog() {
     if (name === '') {
       setNameFieldEmpty(true)
     } else if (roomJoined) {
-      console.log('Join! Name:', name, 'Role:', role, 'Avatar:', avatars[avatarIndex].name)
+      console.log('Join! Name:', name, 'Role:', role, 'Avatar:', shuffledAvatars[avatarIndex].name)
       game.registerKeys()
       game.myPlayer.setPlayerName(name)
-      game.myPlayer.setPlayerTexture(avatars[avatarIndex].name)
+      game.myPlayer.setPlayerTexture(shuffledAvatars[avatarIndex].name)
       if (role) {
         game.myPlayer.setPlayerRole(role)
         game.network.updatePlayerRole(role)
@@ -194,9 +198,10 @@ export default function LoginDialog() {
               setAvatarIndex(swiper.activeIndex)
             }}
           >
-            {avatars.map((avatar) => (
+            {shuffledAvatars.map((avatar) => (
               <SwiperSlide key={avatar.name}>
-                <img src={avatar.img} alt={avatar.name} />
+                <SpritePreview $avatarName={avatar.name} />
+                <AvatarLabel>{avatar.label}</AvatarLabel>
               </SwiperSlide>
             ))}
           </Swiper>
@@ -225,29 +230,11 @@ export default function LoginDialog() {
               setRole((e.target as HTMLInputElement).value)
             }}
           />
-          {!videoConnected && (
-            <Warning>
-              <Alert variant="outlined" severity="warning">
-                <AlertTitle>Attention</AlertTitle>
-                Aucune webcam/micro connecté — <strong>connectez-en pour une meilleure expérience !</strong>
-              </Alert>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={() => {
-                  game.network.webRTC?.getUserMedia()
-                }}
-              >
-                Connecter la webcam
-              </Button>
-            </Warning>
-          )}
-
-          {videoConnected && (
-            <Warning>
-              <Alert variant="outlined">Webcam connectée !</Alert>
-            </Warning>
-          )}
+          <Warning>
+            <Alert variant="outlined">
+              La webcam et le micro seront activés automatiquement en entrant dans une salle de réunion.
+            </Alert>
+          </Warning>
         </Right>
       </Content>
       <Bottom>

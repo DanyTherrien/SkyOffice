@@ -48,8 +48,6 @@ export default function MobileVirtualJoystick() {
   const hasSmallScreen = isSmallScreen(minimumScreenWidthSize)
   const game = phaserGame.scene.keys.game as Game
 
-  useEffect(() => {}, [showJoystick, showChat])
-
   const handleMovement = (movement: JoystickMovement) => {
     game.myPlayer?.handleJoystickMovement(movement)
   }

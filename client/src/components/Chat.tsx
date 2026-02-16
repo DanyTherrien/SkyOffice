@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import styled from 'styled-components'
 import Box from '@mui/material/Box'
 import Fab from '@mui/material/Fab'
+import Badge from '@mui/material/Badge'
 import Tooltip from '@mui/material/Tooltip'
 import IconButton from '@mui/material/IconButton'
 import InputBase from '@mui/material/InputBase'
@@ -16,7 +17,8 @@ import Game from '../scenes/Game'
 
 import { getColorByString } from '../util'
 import { useAppDispatch, useAppSelector } from '../hooks'
-import { MessageType, setFocused, setShowChat } from '../stores/ChatStore'
+import { MessageType, setFocused, setShowChat, setChatTab } from '../stores/ChatStore'
+import { ZONE_NAMES } from '../constants'
 
 const Backdrop = styled.div`
   position: fixed;
@@ -58,6 +60,45 @@ const ChatHeader = styled.div`
     top: 0;
     right: 0;
   }
+`
+
+const TabBar = styled.div`
+  display: flex;
+  background: #1a1a2e;
+  border-left: 1px solid #00000029;
+  border-right: 1px solid #00000029;
+`
+
+const TabButton = styled.button<{ $active: boolean }>`
+  flex: 1;
+  padding: 6px 12px;
+  border: none;
+  background: ${({ $active }) => ($active ? '#2c2c2c' : 'transparent')};
+  color: ${({ $active }) => ($active ? '#14B8A6' : '#999')};
+  font-size: 13px;
+  font-weight: ${({ $active }) => ($active ? 'bold' : 'normal')};
+  cursor: pointer;
+  border-bottom: 2px solid ${({ $active }) => ($active ? '#14B8A6' : 'transparent')};
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  &:hover {
+    color: #eee;
+  }
+`
+
+const UnreadBadge = styled.span`
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
 `
 
 const ChatBox = styled(Box)`
@@ -124,6 +165,7 @@ const dateFormatter = new Intl.DateTimeFormat('fr-CA', {
   dateStyle: 'short',
 })
 
+
 const Message = ({ chatMessage, messageType }) => {
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
@@ -166,9 +208,38 @@ export default function Chat() {
   const [readyToSubmit, setReadyToSubmit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const chatMessages = useAppSelector((state) => state.chat.chatMessages)
+  const allMessages = useAppSelector((state) => state.chat.chatMessages)
+  const activeZone = useAppSelector((state) => state.meeting.activeZone)
   const focused = useAppSelector((state) => state.chat.focused)
   const showChat = useAppSelector((state) => state.chat.showChat)
+  const chatTab = useAppSelector((state) => state.chat.chatTab)
+  const unreadGeneralCount = useAppSelector((state) => state.chat.unreadGeneralCount)
+  const unreadZoneCount = useAppSelector((state) => state.chat.unreadZoneCount)
+
+  // Determiner la zone courante du joueur (peut etre hors meeting)
+  const currentZone = (() => {
+    try {
+      const game = phaserGame.scene.keys.game as Game
+      return game?.myPlayer?.currentZone || ''
+    } catch {
+      return activeZone || ''
+    }
+  })()
+
+  // Filtrer les messages selon l'onglet actif
+  const chatMessages = allMessages.filter((msg) => {
+    if (chatTab === 'general') {
+      // Onglet general: messages globaux (zone vide) + join/leave bureau
+      return msg.zone === ''
+    }
+    // Onglet zone: messages de la zone courante + notifications systeme de cette zone
+    return (
+      msg.zone === currentZone ||
+      msg.zone === '' ||
+      msg.messageType !== MessageType.REGULAR_MESSAGE
+    )
+  })
+
   const dispatch = useAppDispatch()
   const game = phaserGame.scene.keys.game as Game
 
@@ -201,7 +272,13 @@ export default function Chat() {
     const val = inputValue.trim()
     setInputValue('')
     if (val) {
-      game.network.addChatMessage(val)
+      if (chatTab === 'general') {
+        // Envoyer en broadcast global
+        game.network.addChatMessage(val)
+      } else {
+        // Envoyer scope a la zone
+        game.network.addZoneChatMessage(val)
+      }
       game.myPlayer.updateDialogBubble(val)
     }
   }
@@ -226,7 +303,7 @@ export default function Chat() {
         {showChat ? (
           <>
             <ChatHeader>
-              <h3>Clavardage</h3>
+              <h3>Chat</h3>
               <IconButton
                 aria-label="close dialog"
                 className="close"
@@ -236,6 +313,26 @@ export default function Chat() {
                 <CloseIcon />
               </IconButton>
             </ChatHeader>
+            <TabBar>
+              <TabButton
+                $active={chatTab === 'zone'}
+                onClick={() => dispatch(setChatTab('zone'))}
+              >
+                {ZONE_NAMES[currentZone] || 'Zone'}
+                {unreadZoneCount > 0 && (
+                  <UnreadBadge>{unreadZoneCount > 99 ? '99+' : unreadZoneCount}</UnreadBadge>
+                )}
+              </TabButton>
+              <TabButton
+                $active={chatTab === 'general'}
+                onClick={() => dispatch(setChatTab('general'))}
+              >
+                General
+                {unreadGeneralCount > 0 && (
+                  <UnreadBadge>{unreadGeneralCount > 99 ? '99+' : unreadGeneralCount}</UnreadBadge>
+                )}
+              </TabButton>
+            </TabBar>
             <ChatBox>
               {chatMessages.map(({ messageType, chatMessage }, index) => (
                 <Message chatMessage={chatMessage} messageType={messageType} key={index} />
@@ -262,7 +359,11 @@ export default function Chat() {
                 inputRef={inputRef}
                 autoFocus={focused}
                 fullWidth
-                placeholder="Appuyez sur Entrée pour clavarder"
+                placeholder={
+                  chatTab === 'general'
+                    ? 'Message a tous...'
+                    : 'Appuyez sur Entree pour clavarder'
+                }
                 value={inputValue}
                 onKeyDown={handleKeyDown}
                 onChange={handleChange}

@@ -1,23 +1,21 @@
 import React from 'react'
 import styled from 'styled-components'
-import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import CloseIcon from '@mui/icons-material/Close'
 import CircleIcon from '@mui/icons-material/Circle'
 import { useAppSelector } from '../hooks'
+import phaserGame from '../PhaserGame'
+import Game from '../scenes/Game'
+import { ZONE_NAMES, ZONE_ORDER } from '../constants'
 
-// Noms francais des zones
-const zoneNames: Record<string, string> = {
-  hall: "Hall d'entrée",
-  sales: 'Salle de ventes',
-  deep_work: 'Travail profond',
-  brainstorm: 'Remue-méninges',
-  cafe: 'Café / Pause',
-  war_room: 'Salle de stratégie',
+// Couleurs et labels des statuts
+const statusConfig: Record<string, { color: string; label: string }> = {
+  available: { color: '#4ade80', label: 'Disponible' },
+  meeting: { color: '#fb923c', label: 'En reunion' },
+  dnd: { color: '#ef4444', label: 'Ne pas deranger' },
+  idle: { color: '#9ca3af', label: 'Inactif' },
 }
-
-// Ordre d'affichage des zones
-const zoneOrder = ['hall', 'sales', 'deep_work', 'brainstorm', 'cafe', 'war_room']
 
 const PanelWrapper = styled.div`
   position: fixed;
@@ -71,6 +69,11 @@ const PlayerName = styled.span`
   color: #eee;
 `
 
+const SelfBadge = styled.span`
+  color: #14b8a6;
+  font-size: 11px;
+`
+
 const PlayerRole = styled.span`
   color: #999;
   font-size: 11px;
@@ -90,21 +93,37 @@ export default function UserListPanel({ onClose }: UserListPanelProps) {
   const playerNameMap = useAppSelector((state) => state.user.playerNameMap)
   const playerZoneMap = useAppSelector((state) => state.user.playerZoneMap)
   const playerRoleMap = useAppSelector((state) => state.user.playerRoleMap)
+  const playerStatusMap = useAppSelector((state) => state.user.playerStatusMap)
 
   // Regrouper les joueurs par zone
-  const playersByZone: Record<string, { id: string; name: string; role: string }[]> = {}
-  for (const zone of zoneOrder) {
+  const playersByZone: Record<
+    string,
+    { id: string; name: string; role: string; status: string; isSelf: boolean }[]
+  > = {}
+  for (const zone of ZONE_ORDER) {
     playersByZone[zone] = []
   }
 
+  // Ajouter les autres joueurs
   playerNameMap.forEach((name, id) => {
-    const zone = playerZoneMap.get(id) || 'hall'
+    const zone = playerZoneMap.get(id) || 'brainstorm'
     const role = playerRoleMap.get(id) || ''
+    const status = playerStatusMap.get(id) || 'available'
     if (!playersByZone[zone]) playersByZone[zone] = []
-    playersByZone[zone].push({ id, name, role })
+    playersByZone[zone].push({ id, name, role, status, isSelf: false })
   })
 
-  // +1 pour inclure le joueur local (qui n'est pas dans playerNameMap)
+  // Ajouter le joueur local (pas dans playerNameMap car filtre dans Network.ts)
+  const game = phaserGame.scene.keys.game as Game
+  const myName = game?.myPlayer?.playerName?.text || 'Moi'
+  const myZone = game?.myPlayer?.currentZone || 'brainstorm'
+
+  // Determiner le statut local
+  const myStatus = myZone === 'deep_work' ? 'dnd' : myZone === 'meeting' || myZone === 'sales' ? 'meeting' : 'available'
+
+  if (!playersByZone[myZone]) playersByZone[myZone] = []
+  playersByZone[myZone].unshift({ id: '_self', name: myName, role: '', status: myStatus, isSelf: true })
+
   const totalPlayers = playerNameMap.size + 1
 
   return (
@@ -115,22 +134,28 @@ export default function UserListPanel({ onClose }: UserListPanelProps) {
           <CloseIcon fontSize="small" />
         </IconButton>
       </Header>
-      {zoneOrder.map((zone) => {
+      {ZONE_ORDER.map((zone) => {
         const players = playersByZone[zone]
         if (!players || players.length === 0) return null
         return (
           <ZoneSection key={zone}>
             <ZoneTitle>
-              {zoneNames[zone] || zone}
+              {ZONE_NAMES[zone] || zone}
               <CountBadge>({players.length})</CountBadge>
             </ZoneTitle>
-            {players.map((player) => (
-              <PlayerRow key={player.id}>
-                <CircleIcon sx={{ fontSize: 8, color: '#4ade80' }} />
-                <PlayerName>{player.name}</PlayerName>
-                {player.role && <PlayerRole>· {player.role}</PlayerRole>}
-              </PlayerRow>
-            ))}
+            {players.map((player) => {
+              const config = statusConfig[player.status] || statusConfig.available
+              return (
+                <PlayerRow key={player.id}>
+                  <Tooltip title={config.label} placement="left" arrow>
+                    <CircleIcon sx={{ fontSize: 8, color: config.color }} />
+                  </Tooltip>
+                  <PlayerName>{player.name}</PlayerName>
+                  {player.isSelf && <SelfBadge>(vous)</SelfBadge>}
+                  {player.role && <PlayerRole>· {player.role}</PlayerRole>}
+                </PlayerRow>
+              )
+            })}
           </ZoneSection>
         )
       })}

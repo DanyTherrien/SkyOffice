@@ -3,7 +3,7 @@ import { IComputer, IOfficeState, IPlayer, IWhiteboard } from '../../../types/IO
 import { Message } from '../../../types/Messages'
 import { IRoomData, RoomType } from '../../../types/Rooms'
 import { ItemType } from '../../../types/Items'
-import WebRTC from '../web/WebRTC'
+import ZoneMeetingManager from '../web/ZoneMeetingManager'
 import { phaserEvents, Event } from '../events/EventCenter'
 import store from '../stores'
 import {
@@ -14,6 +14,8 @@ import {
   removePlayerZoneMap,
   setPlayerRoleMap,
   removePlayerRoleMap,
+  setPlayerStatusMap,
+  removePlayerStatusMap,
 } from '../stores/UserStore'
 import {
   setLobbyJoined,
@@ -26,14 +28,24 @@ import {
   pushChatMessage,
   pushPlayerJoinedMessage,
   pushPlayerLeftMessage,
+  pushZoneEnterMessage,
+  pushZoneLeaveMessage,
 } from '../stores/ChatStore'
+import {
+  notifyPlayerEnteredZone,
+  notifyPlayerLeftZone,
+  notifyChatMessage,
+  notifyPlayerJoinedOffice,
+  notifyPlayerLeftOffice,
+} from '../web/notificationService'
 import { setWhiteboardUrls } from '../stores/WhiteboardStore'
+import { removePeerScreenStream } from '../stores/MeetingStore'
 
 export default class Network {
   private client: Client
   private room?: Room<IOfficeState>
   private lobby!: Room
-  webRTC?: WebRTC
+  zoneMeetingManager?: ZoneMeetingManager
 
   mySessionId!: string
 
@@ -50,7 +62,6 @@ export default class Network {
 
     phaserEvents.on(Event.MY_PLAYER_NAME_CHANGE, this.updatePlayerName, this)
     phaserEvents.on(Event.MY_PLAYER_TEXTURE_CHANGE, this.updatePlayer, this)
-    phaserEvents.on(Event.PLAYER_DISCONNECTED, this.playerStreamDisconnect, this)
   }
 
   /**
@@ -104,7 +115,10 @@ export default class Network {
     this.lobby.leave()
     this.mySessionId = this.room.sessionId
     store.dispatch(setSessionId(this.room.sessionId))
-    this.webRTC = new WebRTC(this.mySessionId, this)
+    // Creer le gestionnaire de reunions par zone
+    this.zoneMeetingManager = new ZoneMeetingManager(this.mySessionId, (type, data) => {
+      this.room?.send(type, data)
+    })
 
     // new instance added to the players MapSchema
     this.room.state.players.onAdd = (player: IPlayer, key: string) => {
@@ -121,16 +135,46 @@ export default class Network {
             phaserEvents.emit(Event.PLAYER_JOINED, player, key)
             store.dispatch(setPlayerNameMap({ id: key, name: value }))
             store.dispatch(pushPlayerJoinedMessage(value))
+            notifyPlayerJoinedOffice(value)
           }
 
-          // Dispatcher les changements de zone au Redux store
+          // Dispatcher les changements de zone au Redux store + notifications
           if (field === 'zone' && typeof value === 'string') {
+            const previousZone = store.getState().user.playerZoneMap.get(
+              key.replace(/[^0-9a-z]/gi, 'G')
+            )
             store.dispatch(setPlayerZoneMap({ id: key, zone: value }))
+
+            // Notifications d'entree/sortie de zone
+            const playerName = store.getState().user.playerNameMap.get(
+              key.replace(/[^0-9a-z]/gi, 'G')
+            )
+            if (playerName) {
+              // Recuperer la zone du joueur local
+              const myZone = store.getState().user.playerZoneMap.get(
+                this.mySessionId.replace(/[^0-9a-z]/gi, 'G')
+              )
+              // Quelqu'un entre dans notre zone
+              if (value === myZone) {
+                store.dispatch(pushZoneEnterMessage({ name: playerName, zone: value }))
+                notifyPlayerEnteredZone(playerName, value)
+              }
+              // Quelqu'un quitte notre zone
+              if (previousZone && previousZone === myZone && value !== myZone) {
+                store.dispatch(pushZoneLeaveMessage({ name: playerName, zone: previousZone }))
+                notifyPlayerLeftZone(playerName, previousZone)
+              }
+            }
           }
 
           // Dispatcher les changements de role au Redux store
           if (field === 'role' && typeof value === 'string') {
             store.dispatch(setPlayerRoleMap({ id: key, role: value }))
+          }
+
+          // Dispatcher les changements de statut au Redux store
+          if (field === 'status' && typeof value === 'string') {
+            store.dispatch(setPlayerStatusMap({ id: key, status: value }))
           }
         })
       }
@@ -139,12 +183,12 @@ export default class Network {
     // an instance removed from the players MapSchema
     this.room.state.players.onRemove = (player: IPlayer, key: string) => {
       phaserEvents.emit(Event.PLAYER_LEFT, key)
-      this.webRTC?.deleteVideoStream(key)
-      this.webRTC?.deleteOnCalledVideoStream(key)
       store.dispatch(pushPlayerLeftMessage(player.name))
+      notifyPlayerLeftOffice(player.name)
       store.dispatch(removePlayerNameMap(key))
       store.dispatch(removePlayerZoneMap(key))
       store.dispatch(removePlayerRoleMap(key))
+      store.dispatch(removePlayerStatusMap(key))
     }
 
     // new instance added to the computers MapSchema
@@ -190,15 +234,30 @@ export default class Network {
       phaserEvents.emit(Event.UPDATE_DIALOG_BUBBLE, clientId, content)
     })
 
-    // when a peer disconnects with myPeer
-    this.room.onMessage(Message.DISCONNECT_STREAM, (clientId: string) => {
-      this.webRTC?.deleteOnCalledVideoStream(clientId)
-    })
-
     // when a computer user stops sharing screen
     this.room.onMessage(Message.STOP_SCREEN_SHARE, (clientId: string) => {
       const computerState = store.getState().computer
       computerState.shareScreenManager?.onUserLeft(clientId)
+    })
+
+    // Quand le serveur envoie une mise a jour des membres de zone
+    this.room.onMessage(Message.ZONE_MEMBERS_UPDATE, (data: { zone: string; memberIds: string[] }) => {
+      this.zoneMeetingManager?.onZoneMembersChanged(data.memberIds)
+    })
+
+    // Quand un joueur de la meme zone envoie un message chat (dialog bubble seulement, le message Redux est gere par chatMessages.onAdd)
+    this.room.onMessage(Message.ZONE_CHAT_MESSAGE, ({ clientId, content }) => {
+      phaserEvents.emit(Event.UPDATE_DIALOG_BUBBLE, clientId, content)
+      // Notification sonore pour les messages de zone
+      const senderName = store.getState().user.playerNameMap.get(
+        clientId.replace(/[^0-9a-z]/gi, 'G')
+      ) || ''
+      notifyChatMessage(senderName, content)
+    })
+
+    // Quand un joueur de la meme zone arrete son partage d'ecran
+    this.room.onMessage(Message.ZONE_SCREEN_SHARE_STOPPED, (clientId: string) => {
+      this.zoneMeetingManager?.onPeerScreenShareStopped(clientId)
     })
   }
 
@@ -273,12 +332,6 @@ export default class Network {
     phaserEvents.emit(Event.MY_PLAYER_VIDEO_CONNECTED)
   }
 
-  // method to send stream-disconnection signal to Colyseus server
-  playerStreamDisconnect(id: string) {
-    this.room?.send(Message.DISCONNECT_STREAM, { clientId: id })
-    this.webRTC?.deleteVideoStream(id)
-  }
-
   connectToComputer(id: string) {
     this.room?.send(Message.CONNECT_TO_COMPUTER, { computerId: id })
   }
@@ -303,6 +356,11 @@ export default class Network {
     this.room?.send(Message.ADD_CHAT_MESSAGE, { content: content })
   }
 
+  // Envoyer un message de chat scope a la zone actuelle
+  addZoneChatMessage(content: string) {
+    this.room?.send(Message.ADD_ZONE_CHAT_MESSAGE, { content })
+  }
+
   // Envoyer le changement de zone au serveur
   updatePlayerZone(zone: string) {
     this.room?.send(Message.UPDATE_PLAYER_ZONE, { zone })
@@ -311,5 +369,10 @@ export default class Network {
   // Envoyer le role du joueur au serveur
   updatePlayerRole(role: string) {
     this.room?.send(Message.UPDATE_PLAYER_ROLE, { role })
+  }
+
+  // Envoyer le statut du joueur au serveur (available, meeting, dnd)
+  updatePlayerStatus(status: string) {
+    this.room?.send(Message.UPDATE_PLAYER_STATUS, { status })
   }
 }

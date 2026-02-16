@@ -6,7 +6,8 @@
   "scripts": {
     "start": "cd server && ts-node-dev --project tsconfig.server.json --respawn --transpile-only index.ts",
     "start:prod": "cd server && ts-node --project tsconfig.server.json --transpile-only index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "convert-avatar": "node scripts/convert-lpc-sprite.js"
   },
   "repository": {
     "type": "git",
@@ -26,6 +27,7 @@
     "eslint": "^7.11.0",
     "minimist": ">=1.2.2",
     "rimraf": "^2.7.1",
+    "sharp": "^0.34.5",
     "ts-node": "^8.1.0",
     "ts-node-dev": "^1.0.0-pre.63"
   },

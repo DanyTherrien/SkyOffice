@@ -9,13 +9,14 @@ import {
 
 export class Player extends Schema implements IPlayer {
   @type('string') name = ''
-  @type('number') x = 320
-  @type('number') y = 320
+  @type('number') x = 656
+  @type('number') y = 496
   @type('string') anim = 'adam_idle_down'
   @type('boolean') readyToConnect = false
   @type('boolean') videoConnected = false
-  @type('string') zone = 'hall'
+  @type('string') zone = 'brainstorm'
   @type('string') role = ''
+  @type('string') status = 'available'
 }
 
 export class Computer extends Schema implements IComputer {
@@ -31,6 +32,7 @@ export class ChatMessage extends Schema implements IChatMessage {
   @type('string') author = ''
   @type('number') createdAt = new Date().getTime()
   @type('string') content = ''
+  @type('string') zone = ''
 }
 
 export class OfficeState extends Schema implements IOfficeState {

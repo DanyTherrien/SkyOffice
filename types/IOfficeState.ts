@@ -9,6 +9,7 @@ export interface IPlayer extends Schema {
   videoConnected: boolean
   zone: string
   role: string
+  status: string
 }
 
 export interface IComputer extends Schema {
@@ -24,6 +25,7 @@ export interface IChatMessage extends Schema {
   author: string
   createdAt: number
   content: string
+  zone: string
 }
 
 export interface IOfficeState extends Schema {

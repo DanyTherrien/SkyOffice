@@ -65,10 +65,13 @@ Ouvrir http://localhost:5173
 - Branche principale: `capturia/main`
 
 ## Architecture
-- UNE SEULE tilemap avec des zones (pas de scenes Phaser separees)
-- Les "rooms" Capturia (Hall, Sales, Deep Work, etc.) = zones physiques sur la carte
+- Tilemap compacte (24x18 tiles, 768x576 px) avec 4 zones en grille 2x2
+- Les 4 salles: Brainstorming (whiteboard), Meeting (reunion), Deep Work (focus), Sales ($$$)
+- Vitesse joueur: 250 px/s, navigation rapide (~2s max entre zones)
+- Zoom camera: molette souris et +/- (1.5x a 3.5x, defaut 2.0x)
 - Les rooms Colyseus = instances serveur (lobby, public, custom)
 - Chat de proximite: overlap detection Phaser → PeerJS WebRTC call
+- Deep Work bloque les appels auto; Meeting et Sales ont des appels persistants
 - Sync d'etat: Colyseus Schema (serveur) → Redux (client)
 
 ## Plan de travail

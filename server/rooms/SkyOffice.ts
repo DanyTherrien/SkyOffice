@@ -39,13 +39,13 @@ export class SkyOffice extends Room<OfficeState> {
 
     this.setState(new OfficeState())
 
-    // 8 ordinateurs repartis dans les 6 zones
-    for (let i = 0; i < 8; i++) {
+    // 6 ordinateurs repartis dans les 4 salles
+    for (let i = 0; i < 6; i++) {
       this.state.computers.set(String(i), new Computer())
     }
 
-    // 4 tableaux blancs repartis dans les zones
-    for (let i = 0; i < 4; i++) {
+    // 2 tableaux blancs (brainstorm + meeting)
+    for (let i = 0; i < 2; i++) {
       this.state.whiteboards.set(String(i), new Whiteboard())
     }
 
@@ -141,13 +141,65 @@ export class SkyOffice extends Room<OfficeState> {
     // quand un joueur change de zone
     this.onMessage(Message.UPDATE_PLAYER_ZONE, (client, message: { zone: string }) => {
       const player = this.state.players.get(client.sessionId)
-      if (player) player.zone = message.zone
+      if (!player) return
+      const oldZone = player.zone
+      player.zone = message.zone
+      // Broadcaster la liste des membres mise a jour pour les deux zones
+      this.broadcastZoneMembers(oldZone)
+      this.broadcastZoneMembers(message.zone)
     })
 
     // quand un joueur met a jour son role
     this.onMessage(Message.UPDATE_PLAYER_ROLE, (client, message: { role: string }) => {
       const player = this.state.players.get(client.sessionId)
       if (player) player.role = message.role
+    })
+
+    // quand un joueur met a jour son statut (available, meeting, dnd)
+    this.onMessage(Message.UPDATE_PLAYER_STATUS, (client, message: { status: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (player) player.status = message.status
+    })
+
+    // quand un joueur envoie un message de chat zone
+    this.onMessage(Message.ADD_ZONE_CHAT_MESSAGE, (client, message: { content: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const zone = player.zone
+
+      // Stocker le message avec la zone (pour les joueurs qui rejoignent plus tard)
+      this.dispatcher.dispatch(new ChatMessageUpdateCommand(), {
+        client,
+        content: message.content,
+        zone,
+      })
+
+      // Broadcaster seulement aux joueurs de la meme zone
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === client.sessionId) return
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === zone) {
+          cli.send(Message.ZONE_CHAT_MESSAGE, {
+            clientId: client.sessionId,
+            content: message.content,
+            zone,
+          })
+        }
+      })
+    })
+
+    // quand un joueur arrete le screen share de zone
+    this.onMessage(Message.STOP_ZONE_SCREEN_SHARE, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      // Notifier les autres membres de la zone
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === client.sessionId) return
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === player.zone) {
+          cli.send(Message.ZONE_SCREEN_SHARE_STOPPED, client.sessionId)
+        }
+      })
     })
 
     // when a player send a chat message, update the message array and broadcast to all connected clients except the sender
@@ -164,6 +216,20 @@ export class SkyOffice extends Room<OfficeState> {
         { clientId: client.sessionId, content: message.content },
         { except: client }
       )
+    })
+  }
+
+  // Broadcaster la liste des membres d'une zone a tous les clients dans cette zone
+  private broadcastZoneMembers(zone: string) {
+    const memberIds: string[] = []
+    this.state.players.forEach((player, id) => {
+      if (player.zone === zone) memberIds.push(id)
+    })
+    this.clients.forEach((cli) => {
+      const p = this.state.players.get(cli.sessionId)
+      if (p?.zone === zone) {
+        cli.send(Message.ZONE_MEMBERS_UPDATE, { zone, memberIds })
+      }
     })
   }
 
@@ -184,9 +250,19 @@ export class SkyOffice extends Room<OfficeState> {
       name: this.name,
       description: this.description,
     })
+
+    // Notifier les membres existants de la zone par defaut du nouveau joueur
+    const player = this.state.players.get(client.sessionId)
+    if (player?.zone) {
+      this.broadcastZoneMembers(player.zone)
+    }
   }
 
   onLeave(client: Client, consented: boolean) {
+    // Sauvegarder la zone avant de supprimer le joueur pour broadcaster la mise a jour
+    const player = this.state.players.get(client.sessionId)
+    const playerZone = player?.zone
+
     if (this.state.players.has(client.sessionId)) {
       this.state.players.delete(client.sessionId)
     }
@@ -200,6 +276,11 @@ export class SkyOffice extends Room<OfficeState> {
         whiteboard.connectedUser.delete(client.sessionId)
       }
     })
+
+    // Notifier les autres membres de la zone que ce joueur est parti
+    if (playerZone) {
+      this.broadcastZoneMembers(playerZone)
+    }
   }
 
   onDispose() {
