@@ -8,9 +8,34 @@ export default class ShareScreenManager {
   private myPeer: Peer
   myStream?: MediaStream
 
+  /** Configuration ICE pour la traversee NAT en production (STUN + TURN) */
+  private readonly peerConfig = {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turns:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+      ],
+    },
+  }
+
   constructor(private userId: string) {
     const sanatizedId = this.makeId(userId)
-    this.myPeer = new Peer(sanatizedId)
+    this.myPeer = new Peer(sanatizedId, this.peerConfig)
     this.myPeer.on('error', (err) => {
       console.log('ShareScreenWebRTC err.type', err.type)
       console.error('ShareScreenWebRTC', err)

@@ -62,13 +62,38 @@ export default class ZoneMeetingManager {
     this.initializePeers()
   }
 
+  /** Configuration ICE pour la traversee NAT en production (STUN + TURN) */
+  private readonly peerConfig = {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turns:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+      ],
+    },
+  }
+
   /**
    * Initialise (ou reinitialise) les deux instances PeerJS.
    * Le peer principal utilise l'ID sanitize, le peer screen share ajoute le suffixe '-zm-ss'.
    */
   private initializePeers(): void {
     // --- Peer principal (webcam) ---
-    this.myPeer = new Peer(this.mySanitizedId)
+    this.myPeer = new Peer(this.mySanitizedId, this.peerConfig)
 
     this.myPeer.on('open', () => {
       console.log('[ZoneMeeting] Peer principal ouvert:', this.mySanitizedId)
@@ -119,7 +144,7 @@ export default class ZoneMeetingManager {
         this.mainPeerReady = false
         setTimeout(() => {
           if (this.myPeer.destroyed) {
-            this.myPeer = new Peer(this.mySanitizedId)
+            this.myPeer = new Peer(this.mySanitizedId, this.peerConfig)
             this.setupMainPeerEvents()
           } else {
             this.myPeer.reconnect()
@@ -138,7 +163,7 @@ export default class ZoneMeetingManager {
 
     // --- Peer partage d'ecran ---
     const screenPeerId = this.mySanitizedId + '-zm-ss'
-    this.myScreenPeer = new Peer(screenPeerId)
+    this.myScreenPeer = new Peer(screenPeerId, this.peerConfig)
 
     this.myScreenPeer.on('open', () => {
       console.log('[ZoneMeeting] Peer screen share ouvert:', screenPeerId)
@@ -186,7 +211,7 @@ export default class ZoneMeetingManager {
         this.screenPeerReady = false
         setTimeout(() => {
           if (this.myScreenPeer.destroyed) {
-            this.myScreenPeer = new Peer(this.mySanitizedId + '-zm-ss')
+            this.myScreenPeer = new Peer(this.mySanitizedId + '-zm-ss', this.peerConfig)
             this.setupScreenPeerEvents()
           } else {
             this.myScreenPeer.reconnect()
