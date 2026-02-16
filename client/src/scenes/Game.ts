@@ -24,7 +24,6 @@ import {
   setShowMeetingPreview,
   setPendingZone,
   setShowZoneEntryBanner,
-  setBannerZoneName,
 } from '../stores/MeetingStore'
 import { NavKeys, Keyboard } from '../../../types/KeyboardState'
 import { sanitizeId } from '../util'
@@ -354,17 +353,14 @@ export default class Game extends Phaser.Scene {
 
   // ─── Grace period et banniere d'entree en zone de reunion ──────────────
 
-  /** Demarre un timer de 1.5s : si le joueur reste dans la zone, affiche la banniere */
+  /** Demarre un timer de 1.5s : si le joueur reste dans la zone, rejoint automatiquement la reunion */
   private startZoneEntryGracePeriod(zoneName: string): void {
     this.clearZoneEntryTimer()
     this.zoneEntryTimer = setTimeout(() => {
       this.zoneEntryTimer = null
-      store.dispatch(setBannerZoneName(zoneName))
-      store.dispatch(setShowZoneEntryBanner(true))
-      // Auto-hide apres 8s
-      this.bannerAutoHideTimer = setTimeout(() => {
-        this.hideBanner()
-      }, 8000)
+      // Rejoindre automatiquement la reunion de zone
+      this.network.zoneMeetingManager?.joinZone(zoneName)
+      console.log(`[Capturia] Auto-join reunion: ${ZONE_NAMES[zoneName] || zoneName}`)
     }, 1500)
   }
 
