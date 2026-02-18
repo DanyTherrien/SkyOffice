@@ -3,6 +3,7 @@ import styled from 'styled-components'
 
 import { useAppSelector } from './hooks'
 
+import GoogleLoginPage from './components/GoogleLoginPage'
 import RoomSelectionDialog from './components/RoomSelectionDialog'
 import LoginDialog from './components/LoginDialog'
 import ComputerDialog from './components/ComputerDialog'
@@ -51,7 +52,20 @@ function App(): JSX.Element {
   const computerDialogOpen = useAppSelector((state) => state.computer.computerDialogOpen)
   const whiteboardDialogOpen = useAppSelector((state) => state.whiteboard.whiteboardDialogOpen)
   const roomJoined = useAppSelector((state) => state.room.roomJoined)
+  const authToken = useAppSelector((state) => state.user.authToken)
   const [pomodoroVisible, setPomodoroVisible] = useState(false)
+
+  // En production, exiger l'authentification Google. En dev, sauter si pas de Client ID.
+  const requireAuth =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID && import.meta.env.VITE_GOOGLE_CLIENT_ID !== ''
+
+  if (requireAuth && !authToken) {
+    return (
+      <ErrorBoundary>
+        <GoogleLoginPage />
+      </ErrorBoundary>
+    )
+  }
 
   let ui: JSX.Element
   if (loggedIn) {

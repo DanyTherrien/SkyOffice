@@ -112,24 +112,28 @@ export default class Network {
 
   // method to join the public lobby
   async joinOrCreatePublic(): Promise<void> {
-    this.room = await this.client.joinOrCreate(RoomType.PUBLIC)
+    const authToken = store.getState().user.authToken
+    this.room = await this.client.joinOrCreate(RoomType.PUBLIC, { token: authToken })
     this.initialize()
   }
 
   // method to join a custom room
   async joinCustomById(roomId: string, password: string | null): Promise<void> {
-    this.room = await this.client.joinById(roomId, { password })
+    const authToken = store.getState().user.authToken
+    this.room = await this.client.joinById(roomId, { password, token: authToken })
     this.initialize()
   }
 
   // method to create a custom room
   async createCustom(roomData: IRoomData): Promise<void> {
     const { name, description, password, autoDispose } = roomData
+    const authToken = store.getState().user.authToken
     this.room = await this.client.create(RoomType.CUSTOM, {
       name,
       description,
       password,
       autoDispose,
+      token: authToken,
     })
     this.initialize()
   }

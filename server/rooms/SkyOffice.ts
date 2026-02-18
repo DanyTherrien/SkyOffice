@@ -779,9 +779,22 @@ export class SkyOffice extends Room<OfficeState> {
     return count
   }
 
-  async onAuth(_client: Client, options: { password: string | null }): Promise<boolean> {
+  async onAuth(_client: Client, options: any): Promise<boolean> {
+    // En production, verifier le JWT si Google SSO est configure
+    if (process.env.NODE_ENV === 'production' && process.env.GOOGLE_CLIENT_ID) {
+      if (!options?.token) {
+        throw new ServerError(401, 'Token d\'authentification requis')
+      }
+      try {
+        const { verifyJwt } = require('../auth/googleAuth')
+        verifyJwt(options.token)
+      } catch {
+        throw new ServerError(401, 'Token invalide')
+      }
+    }
+    // En dev ou si pas de Google Client ID configure, on accepte tout
     if (this.password) {
-      const validPassword = await bcrypt.compare(options.password, this.password)
+      const validPassword = await bcrypt.compare(options?.password, this.password)
       if (!validPassword) {
         throw new ServerError(403, 'Mot de passe incorrect !')
       }

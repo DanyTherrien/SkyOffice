@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/DanyTherrien/SkyOffice#readme",
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
     "copyfiles": "^2.4.1",
@@ -42,6 +43,8 @@
     "colyseus.js": "^0.14.12",
     "cors": "^2.8.5",
     "express": "^4.16.4",
+    "google-auth-library": "^10.5.0",
+    "jsonwebtoken": "^9.0.3",
     "livekit-server-sdk": "^2.15.0",
     "phaser": "^3.55.2",
     "regenerator-runtime": "^0.13.7",

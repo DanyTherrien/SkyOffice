@@ -27,6 +27,10 @@ export const userSlice = createSlice({
     showJoystick: window.innerWidth < 650,
     // 3B — Profil joueur popover
     profilePlayerId: null as string | null,
+    // Google SSO auth state (persiste dans localStorage)
+    authToken: localStorage.getItem('capturia-auth-token') as string | null,
+    authEmail: localStorage.getItem('capturia-auth-email') as string | null,
+    authName: localStorage.getItem('capturia-auth-name') as string | null,
   },
   reducers: {
     toggleBackgroundMode: (state) => {
@@ -96,6 +100,26 @@ export const userSlice = createSlice({
     removePlayerJoinTime: (state, action: PayloadAction<string>) => {
       state.playerJoinTimeMap.delete(sanitizeId(action.payload))
     },
+    // Google SSO — stocker/effacer l'authentification
+    setAuth: (
+      state,
+      action: PayloadAction<{ token: string; email: string; name: string }>
+    ) => {
+      state.authToken = action.payload.token
+      state.authEmail = action.payload.email
+      state.authName = action.payload.name
+      localStorage.setItem('capturia-auth-token', action.payload.token)
+      localStorage.setItem('capturia-auth-email', action.payload.email)
+      localStorage.setItem('capturia-auth-name', action.payload.name)
+    },
+    clearAuth: (state) => {
+      state.authToken = null
+      state.authEmail = null
+      state.authName = null
+      localStorage.removeItem('capturia-auth-token')
+      localStorage.removeItem('capturia-auth-email')
+      localStorage.removeItem('capturia-auth-name')
+    },
   },
 })
 
@@ -120,6 +144,8 @@ export const {
   setProfilePlayerId,
   setPlayerJoinTime,
   removePlayerJoinTime,
+  setAuth,
+  clearAuth,
 } = userSlice.actions
 
 export default userSlice.reducer

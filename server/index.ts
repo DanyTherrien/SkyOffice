@@ -8,6 +8,7 @@ import { RoomType } from '../types/Rooms'
 // import socialRoutes from "@colyseus/social/express"
 
 import { SkyOffice } from './rooms/SkyOffice'
+import { verifyGoogleToken, issueJwt } from './auth/googleAuth'
 
 const port = Number(process.env.PORT || 2567)
 const app = express()
@@ -18,6 +19,20 @@ app.use(express.json())
 // Endpoint de sante pour les health checks (Fly.io)
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' })
+})
+
+// Route d'authentification Google SSO
+app.post('/auth/google', async (req, res) => {
+  try {
+    const { idToken } = req.body
+    if (!idToken) return res.status(400).json({ error: 'Token manquant' })
+    const user = await verifyGoogleToken(idToken)
+    const token = issueJwt(user.email, user.name)
+    res.json({ token, email: user.email, name: user.name, picture: user.picture })
+  } catch (err: any) {
+    console.error('Auth error:', err.message)
+    res.status(401).json({ error: err.message })
+  }
 })
 
 const server = http.createServer(app)
