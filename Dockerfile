@@ -1,7 +1,7 @@
 # Dockerfile pour le serveur Capturia Office (Colyseus + Express)
 # Deploiement sur Fly.io — region yul (Montreal)
 
-FROM node:18
+FROM node:20
 
 WORKDIR /app
 
