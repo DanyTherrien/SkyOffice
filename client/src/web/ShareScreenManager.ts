@@ -1,72 +1,25 @@
-import Peer from 'peerjs'
 import store from '../stores'
-import { setMyStream, addVideoStream, removeVideoStream } from '../stores/ComputerStore'
+import { setMyStream } from '../stores/ComputerStore'
 import phaserGame from '../PhaserGame'
 import Game from '../scenes/Game'
 
+/**
+ * Gestionnaire de partage d'ecran pour les items Computer.
+ * Utilise getDisplayMedia() pour capturer l'ecran localement.
+ * Le partage peer-to-peer (anciennement PeerJS) a ete retire —
+ * le partage de zone via LiveKit remplace ce cas d'usage.
+ */
 export default class ShareScreenManager {
-  private myPeer: Peer
   myStream?: MediaStream
 
-  /** Configuration ICE pour la traversee NAT en production (STUN + TURN) */
-  private readonly peerConfig = {
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-        {
-          urls: 'turns:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-      ],
-    },
-  }
-
-  constructor(private userId: string) {
-    const sanatizedId = this.makeId(userId)
-    this.myPeer = new Peer(sanatizedId, this.peerConfig)
-    this.myPeer.on('error', (err) => {
-      console.log('ShareScreenWebRTC err.type', err.type)
-      console.error('ShareScreenWebRTC', err)
-    })
-
-    this.myPeer.on('call', (call) => {
-      call.answer()
-
-      call.on('stream', (userVideoStream) => {
-        store.dispatch(addVideoStream({ id: call.peer, call, stream: userVideoStream }))
-      })
-      // we handled on close on our own
-    })
-  }
+  constructor(private userId: string) {}
 
   onOpen(): void {
-    if (this.myPeer.disconnected) {
-      this.myPeer.reconnect()
-    }
+    // Rien a faire — pas de connexion peer a gerer
   }
 
   onClose(): void {
     this.stopScreenShare(false)
-    this.myPeer.disconnect()
-  }
-
-  // PeerJS throws invalid_id error if it contains some characters such as that colyseus generates.
-  // https://peerjs.com/docs.html#peer-id
-  // Also for screen sharing ID add a `-ss` at the end.
-  private makeId(id: string) {
-    return `${id.replace(/[^0-9a-z]/gi, 'G')}-ss`
   }
 
   startScreenShare(): void {
@@ -76,8 +29,7 @@ export default class ShareScreenManager {
         audio: true,
       })
       .then((stream) => {
-        // Detect when user clicks "Stop sharing" outside of our UI.
-        // https://stackoverflow.com/a/25179198
+        // Detecter quand l'utilisateur clique "Arreter le partage" hors de notre UI.
         const track = stream.getVideoTracks()[0]
         if (track) {
           track.onended = () => {
@@ -87,47 +39,21 @@ export default class ShareScreenManager {
 
         this.myStream = stream
         store.dispatch(setMyStream(stream))
-
-        // Call all existing users.
-        const game = phaserGame.scene.keys.game as Game
-        const computerId = store.getState().computer.computerId
-        const computerItem = computerId ? game.computerMap.get(computerId) : undefined
-        if (computerItem) {
-          for (const userId of computerItem.currentUsers) {
-            this.onUserJoined(userId)
-          }
-        }
       })
   }
 
-  // TODO(daxchen): Fix this trash hack, if we call store.dispatch here when calling
-  // from onClose, it causes redux reducer cycle, this may be fixable by using thunk
-  // or something.
+  // Si shouldDispatch est false, on ne dispatch pas vers Redux (evite un cycle reducer).
   stopScreenShare(shouldDispatch = true): void {
     this.myStream?.getTracks().forEach((track) => track.stop())
     this.myStream = undefined
     if (shouldDispatch) {
       store.dispatch(setMyStream(null))
-      // Manually let all other existing users know screen sharing is stopped
+      // Informer les autres utilisateurs que le partage est arrete
       const game = phaserGame.scene.keys.game as Game
       const currentComputerId = store.getState().computer.computerId
       if (currentComputerId) {
         game.network.onStopScreenShare(currentComputerId)
       }
     }
-  }
-
-  onUserJoined(userId: string): void {
-    if (!this.myStream || userId === this.userId) return
-
-    const sanatizedId = this.makeId(userId)
-    this.myPeer.call(sanatizedId, this.myStream)
-  }
-
-  onUserLeft(userId: string): void {
-    if (userId === this.userId) return
-
-    const sanatizedId = this.makeId(userId)
-    store.dispatch(removeVideoStream(sanatizedId))
   }
 }

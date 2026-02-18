@@ -23,10 +23,21 @@ export const userSlice = createSlice({
     playerStatusMap: new Map<string, string>(),
     playerAfkReasonMap: new Map<string, string>(),
     playerSalesStatusMap: new Map<string, string>(),
+    playerCustomStatusMap: new Map<string, string>(),
+    playerDndMap: new Map<string, boolean>(),
     playerJoinTimeMap: new Map<string, number>(),
+    // Status local du joueur
+    myStatusPreset: 'available' as string,
+    myStatusCustom: '' as string,
+    myDnd: false,
+    myStatusAutoSet: false, // true si le statut a ete auto-detecte (zone/call)
     showJoystick: window.innerWidth < 650,
     // 3B — Profil joueur popover
     profilePlayerId: null as string | null,
+    // Google SSO auth state (persiste dans localStorage)
+    authToken: localStorage.getItem('capturia-auth-token') as string | null,
+    authEmail: localStorage.getItem('capturia-auth-email') as string | null,
+    authName: localStorage.getItem('capturia-auth-name') as string | null,
   },
   reducers: {
     toggleBackgroundMode: (state) => {
@@ -82,6 +93,24 @@ export const userSlice = createSlice({
     removePlayerSalesStatusMap: (state, action: PayloadAction<string>) => {
       state.playerSalesStatusMap.delete(sanitizeId(action.payload))
     },
+    setPlayerCustomStatusMap: (state, action: PayloadAction<{ id: string; custom: string }>) => {
+      state.playerCustomStatusMap.set(sanitizeId(action.payload.id), action.payload.custom)
+    },
+    removePlayerCustomStatusMap: (state, action: PayloadAction<string>) => {
+      state.playerCustomStatusMap.delete(sanitizeId(action.payload))
+    },
+    setPlayerDndMap: (state, action: PayloadAction<{ id: string; dnd: boolean }>) => {
+      state.playerDndMap.set(sanitizeId(action.payload.id), action.payload.dnd)
+    },
+    removePlayerDndMap: (state, action: PayloadAction<string>) => {
+      state.playerDndMap.delete(sanitizeId(action.payload))
+    },
+    setMyStatus: (state, action: PayloadAction<{ preset: string; custom: string; dnd: boolean; autoSet?: boolean }>) => {
+      state.myStatusPreset = action.payload.preset
+      state.myStatusCustom = action.payload.custom
+      state.myDnd = action.payload.dnd
+      state.myStatusAutoSet = action.payload.autoSet ?? false
+    },
     setShowJoystick: (state, action: PayloadAction<boolean>) => {
       state.showJoystick = action.payload
     },
@@ -95,6 +124,26 @@ export const userSlice = createSlice({
     },
     removePlayerJoinTime: (state, action: PayloadAction<string>) => {
       state.playerJoinTimeMap.delete(sanitizeId(action.payload))
+    },
+    // Google SSO — stocker/effacer l'authentification
+    setAuth: (
+      state,
+      action: PayloadAction<{ token: string; email: string; name: string }>
+    ) => {
+      state.authToken = action.payload.token
+      state.authEmail = action.payload.email
+      state.authName = action.payload.name
+      localStorage.setItem('capturia-auth-token', action.payload.token)
+      localStorage.setItem('capturia-auth-email', action.payload.email)
+      localStorage.setItem('capturia-auth-name', action.payload.name)
+    },
+    clearAuth: (state) => {
+      state.authToken = null
+      state.authEmail = null
+      state.authName = null
+      localStorage.removeItem('capturia-auth-token')
+      localStorage.removeItem('capturia-auth-email')
+      localStorage.removeItem('capturia-auth-name')
     },
   },
 })
@@ -116,10 +165,17 @@ export const {
   removePlayerAfkReasonMap,
   setPlayerSalesStatusMap,
   removePlayerSalesStatusMap,
+  setPlayerCustomStatusMap,
+  removePlayerCustomStatusMap,
+  setPlayerDndMap,
+  removePlayerDndMap,
+  setMyStatus,
   setShowJoystick,
   setProfilePlayerId,
   setPlayerJoinTime,
   removePlayerJoinTime,
+  setAuth,
+  clearAuth,
 } = userSlice.actions
 
 export default userSlice.reducer

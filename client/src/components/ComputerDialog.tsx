@@ -85,10 +85,8 @@ function VideoContainer({ playerName, stream }) {
 
 export default function ComputerDialog(): JSX.Element {
   const dispatch = useAppDispatch()
-  const playerNameMap = useAppSelector((state) => state.user.playerNameMap)
   const shareScreenManager = useAppSelector((state) => state.computer.shareScreenManager)
   const myStream = useAppSelector((state) => state.computer.myStream)
-  const peerStreams = useAppSelector((state) => state.computer.peerStreams)
 
   return (
     <Backdrop>
@@ -119,11 +117,6 @@ export default function ComputerDialog(): JSX.Element {
 
         <VideoGrid>
           {myStream && <VideoContainer stream={myStream} playerName="Vous" />}
-
-          {[...peerStreams.entries()].map(([id, { stream }]) => {
-            const playerName = playerNameMap.get(id)
-            return <VideoContainer key={id} playerName={playerName} stream={stream} />
-          })}
         </VideoGrid>
       </Wrapper>
     </Backdrop>

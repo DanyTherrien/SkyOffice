@@ -3,7 +3,7 @@ import { IComputer, IOfficeState, IPlayer, IWhiteboard } from '../../../types/IO
 import { Message } from '../../../types/Messages'
 import { IRoomData, RoomType } from '../../../types/Rooms'
 import { ItemType } from '../../../types/Items'
-import ZoneMeetingManager from '../web/ZoneMeetingManager'
+import { liveKitService } from '../web/LiveKitService'
 import { phaserEvents, Event } from '../events/EventCenter'
 import store from '../stores'
 import {
@@ -20,6 +20,11 @@ import {
   removePlayerAfkReasonMap,
   setPlayerSalesStatusMap,
   removePlayerSalesStatusMap,
+  setPlayerCustomStatusMap,
+  removePlayerCustomStatusMap,
+  setPlayerDndMap,
+  removePlayerDndMap,
+  setMyStatus,
   setPlayerJoinTime,
   removePlayerJoinTime,
 } from '../stores/UserStore'
@@ -48,6 +53,7 @@ import {
   notifyPlayerJoinedOffice,
   notifyPlayerLeftOffice,
 } from '../web/notificationService'
+import { setZoneMemberIds, removePeerScreenStream } from '../stores/MeetingStore'
 import { setWhiteboardUrls } from '../stores/WhiteboardStore'
 import { pushToast } from '../stores/ToastStore'
 import { addDeferredMessage } from '../stores/DeferredMessageStore'
@@ -71,7 +77,6 @@ export default class Network {
   private client: Client
   private room?: Room<IOfficeState>
   private lobby!: Room
-  zoneMeetingManager?: ZoneMeetingManager
 
   mySessionId!: string
 
@@ -112,24 +117,28 @@ export default class Network {
 
   // method to join the public lobby
   async joinOrCreatePublic(): Promise<void> {
-    this.room = await this.client.joinOrCreate(RoomType.PUBLIC)
+    const authToken = store.getState().user.authToken
+    this.room = await this.client.joinOrCreate(RoomType.PUBLIC, { token: authToken })
     this.initialize()
   }
 
   // method to join a custom room
   async joinCustomById(roomId: string, password: string | null): Promise<void> {
-    this.room = await this.client.joinById(roomId, { password })
+    const authToken = store.getState().user.authToken
+    this.room = await this.client.joinById(roomId, { password, token: authToken })
     this.initialize()
   }
 
   // method to create a custom room
   async createCustom(roomData: IRoomData): Promise<void> {
     const { name, description, password, autoDispose } = roomData
+    const authToken = store.getState().user.authToken
     this.room = await this.client.create(RoomType.CUSTOM, {
       name,
       description,
       password,
       autoDispose,
+      token: authToken,
     })
     this.initialize()
   }
@@ -141,8 +150,8 @@ export default class Network {
     this.lobby.leave()
     this.mySessionId = this.room.sessionId
     store.dispatch(setSessionId(this.room.sessionId))
-    // Creer le gestionnaire de reunions par zone
-    this.zoneMeetingManager = new ZoneMeetingManager(this.mySessionId, (type, data) => {
+    // Configurer le service LiveKit pour qu'il puisse envoyer des messages Colyseus
+    liveKitService.setMessageSender((type, data) => {
       this.room?.send(type, data)
     })
 
@@ -295,6 +304,16 @@ export default class Network {
             store.dispatch(setPlayerStatusMap({ id: key, status: value }))
           }
 
+          // Dispatcher les changements de statut personnalise au Redux store
+          if (field === 'statusCustom' && typeof value === 'string') {
+            store.dispatch(setPlayerCustomStatusMap({ id: key, custom: value }))
+          }
+
+          // Dispatcher les changements de DND au Redux store
+          if (field === 'dnd' && typeof value === 'boolean') {
+            store.dispatch(setPlayerDndMap({ id: key, dnd: value }))
+          }
+
           // Dispatcher les changements de raison AFK au Redux store
           if (field === 'afkReason' && typeof value === 'string') {
             store.dispatch(setPlayerAfkReasonMap({ id: key, reason: value }))
@@ -319,6 +338,8 @@ export default class Network {
       store.dispatch(removePlayerZoneMap(key))
       store.dispatch(removePlayerRoleMap(key))
       store.dispatch(removePlayerStatusMap(key))
+      store.dispatch(removePlayerCustomStatusMap(key))
+      store.dispatch(removePlayerDndMap(key))
       store.dispatch(removePlayerAfkReasonMap(key))
       store.dispatch(removePlayerSalesStatusMap(key))
       store.dispatch(removePlayerJoinTime(key))
@@ -373,20 +394,44 @@ export default class Network {
       store.dispatch(setJoinedRoomData(content))
     })
 
+    // Historique de chat depuis SQLite (envoye au join)
+    this.room.onMessage(
+      Message.CHAT_HISTORY,
+      (data: {
+        messages: Array<{
+          sender_name: string
+          content: string
+          zone: string
+          created_at: string
+        }>
+      }) => {
+        for (const msg of data.messages) {
+          store.dispatch(
+            pushChatMessage({
+              author: msg.sender_name,
+              content: msg.content,
+              createdAt: new Date(msg.created_at).getTime(),
+              zone: msg.zone,
+            } as any)
+          )
+        }
+      }
+    )
+
     // when a user sends a message
     this.room.onMessage(Message.ADD_CHAT_MESSAGE, ({ clientId, content }) => {
       phaserEvents.emit(Event.UPDATE_DIALOG_BUBBLE, clientId, content)
     })
 
-    // when a computer user stops sharing screen
-    this.room.onMessage(Message.STOP_SCREEN_SHARE, (clientId: string) => {
-      const computerState = store.getState().computer
-      computerState.shareScreenManager?.onUserLeft(clientId)
+    // when a computer user stops sharing screen (no-op: peer streaming removed, zone LiveKit handles this)
+    this.room.onMessage(Message.STOP_SCREEN_SHARE, (_clientId: string) => {
+      // Anciennement: shareScreenManager.onUserLeft(clientId) via PeerJS
+      // Le partage d'ecran de zone est maintenant gere par LiveKit
     })
 
     // Quand le serveur envoie une mise a jour des membres de zone
     this.room.onMessage(Message.ZONE_MEMBERS_UPDATE, (data: { zone: string; memberIds: string[] }) => {
-      this.zoneMeetingManager?.onZoneMembersChanged(data.memberIds)
+      store.dispatch(setZoneMemberIds(data.memberIds))
     })
 
     // Quand un joueur de la meme zone envoie un message chat (dialog bubble seulement, le message Redux est gere par chatMessages.onAdd)
@@ -405,7 +450,16 @@ export default class Network {
 
     // Quand un joueur de la meme zone arrete son partage d'ecran
     this.room.onMessage(Message.ZONE_SCREEN_SHARE_STOPPED, (clientId: string) => {
-      this.zoneMeetingManager?.onPeerScreenShareStopped(clientId)
+      store.dispatch(removePeerScreenStream(clientId))
+    })
+
+    // Quand le serveur envoie un token LiveKit pour rejoindre une reunion de zone
+    this.room.onMessage(Message.LIVEKIT_TOKEN, async (message: { token: string; zone: string }) => {
+      try {
+        await liveKitService.connect(message.token, message.zone)
+      } catch (err) {
+        console.error('Erreur connexion LiveKit:', err)
+      }
     })
 
     // Quand le serveur refuse l'entree dans une zone pleine (one_on_one max 2)
@@ -754,6 +808,11 @@ export default class Network {
     this.room?.send(Message.ADD_ZONE_CHAT_MESSAGE, { content })
   }
 
+  // Demander un token LiveKit au serveur pour rejoindre une reunion de zone
+  requestLiveKitToken(zone: string): void {
+    this.room?.send(Message.REQUEST_LIVEKIT_TOKEN, { zone })
+  }
+
   // Envoyer le changement de zone au serveur
   updatePlayerZone(zone: string): void {
     this.room?.send(Message.UPDATE_PLAYER_ZONE, { zone })
@@ -767,6 +826,28 @@ export default class Network {
   // Envoyer le statut du joueur au serveur (available, meeting, dnd)
   updatePlayerStatus(status: string): void {
     this.room?.send(Message.UPDATE_PLAYER_STATUS, { status })
+  }
+
+  // Envoyer le statut Slack-like complet au serveur (preset + custom + DND)
+  updateStatus(preset: string, custom: string, dnd: boolean): void {
+    this.room?.send(Message.UPDATE_STATUS, { preset, custom, dnd })
+    store.dispatch(setMyStatus({ preset, custom, dnd, autoSet: false }))
+  }
+
+  // Auto-detecter le statut en fonction de la zone (seulement si le statut n'a pas ete manuellement defini)
+  autoDetectStatusFromZone(zone: string): void {
+    const state = store.getState().user
+    // Ne pas override un statut manuellement defini
+    if (!state.myStatusAutoSet && state.myStatusPreset !== 'available') return
+
+    let preset = 'available'
+    if (zone === 'meeting' || zone === 'one_on_one') preset = 'in_meeting'
+    else if (zone === 'deep_work') preset = 'focusing'
+
+    const dnd = zone === 'deep_work'
+
+    this.room?.send(Message.UPDATE_STATUS, { preset, custom: '', dnd })
+    store.dispatch(setMyStatus({ preset, custom: '', dnd, autoSet: true }))
   }
 
   // Envoyer la raison AFK au serveur

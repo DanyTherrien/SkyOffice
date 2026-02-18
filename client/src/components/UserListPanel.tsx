@@ -12,6 +12,7 @@ import { ZONE_NAMES, ZONE_ORDER, ZONE_COLORS } from '../constants'
 import { getColorByString } from '../util'
 import { slideUp } from '../styles/animations'
 import { AFK_REASONS } from './AfkStatusPicker'
+import { STATUS_PRESET_MAP } from './StatusPicker'
 import ObserveButton from './ObserveButton'
 import KnockButton from './KnockButton'
 import { setWaiting } from '../stores/BoothInviteStore'
@@ -28,10 +29,18 @@ const salesStatusIcons: Record<string, { icon: string; label: string }> = {
 
 // ─── 3D — Redesign du UserListPanel ────────────────────────────────────────
 
-// Couleurs et labels des statuts
-const statusConfig: Record<string, { color: string; label: string }> = {
+// Couleurs et labels des statuts (legacy + Slack-like presets)
+const statusConfig: Record<string, { color: string; label: string; emoji?: string }> = {
   available: { color: '#4ade80', label: 'Disponible' },
-  meeting: { color: '#fb923c', label: 'En reunion' },
+  in_meeting: { color: '#fb923c', label: 'En reunion', emoji: '\uD83D\uDCC5' },
+  focusing: { color: '#3b82f6', label: 'Concentre', emoji: '\uD83C\uDFA7' },
+  on_call: { color: '#fb923c', label: 'En appel', emoji: '\uD83D\uDCDE' },
+  brb: { color: '#eab308', label: 'De retour bientot', emoji: '\u2615' },
+  sick: { color: '#ef4444', label: 'Malade', emoji: '\uD83E\uDD12' },
+  remote: { color: '#14b8a6', label: 'Teletravail', emoji: '\uD83C\uDFE0' },
+  custom: { color: '#6b7280', label: 'Personnalise', emoji: '\u270F\uFE0F' },
+  // Legacy statuts (backward compat)
+  meeting: { color: '#fb923c', label: 'En reunion', emoji: '\uD83D\uDCC5' },
   dnd: { color: '#ef4444', label: 'Ne pas deranger' },
   afk: { color: '#6b7280', label: 'En pause' },
   idle: { color: '#9ca3af', label: 'Inactif' },
@@ -226,6 +235,16 @@ const SalesStatusText = styled.span`
   font-size: 11px;
 `
 
+const CustomStatusText = styled.span`
+  color: #9ca3af;
+  font-size: 11px;
+  font-style: italic;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
 const DeferredNote = styled.div`
   font-size: 10px;
   color: #8b5cf688;
@@ -284,7 +303,12 @@ export default function UserListPanel({ onClose }: UserListPanelProps): JSX.Elem
   const playerStatusMap = useAppSelector((state) => state.user.playerStatusMap)
   const playerAfkReasonMap = useAppSelector((state) => state.user.playerAfkReasonMap)
   const playerSalesStatusMap = useAppSelector((state) => state.user.playerSalesStatusMap)
+  const playerCustomStatusMap = useAppSelector((state) => state.user.playerCustomStatusMap)
+  const playerDndMap = useAppSelector((state) => state.user.playerDndMap)
   const playerJoinTimeMap = useAppSelector((state) => state.user.playerJoinTimeMap)
+  const myStatusPreset = useAppSelector((state) => state.user.myStatusPreset)
+  const myStatusCustom = useAppSelector((state) => state.user.myStatusCustom)
+  const myDnd = useAppSelector((state) => state.user.myDnd)
   const boothWaiting = useAppSelector((state) => state.boothInvite.waitingForResponse)
   const dispatch = useAppDispatch()
 
@@ -298,7 +322,7 @@ export default function UserListPanel({ onClose }: UserListPanelProps): JSX.Elem
   // Regrouper les joueurs par zone
   const playersByZone: Record<
     string,
-    { id: string; name: string; role: string; status: string; isSelf: boolean; joinTime?: number; zone: string }[]
+    { id: string; name: string; role: string; status: string; customStatus: string; isDnd: boolean; isSelf: boolean; joinTime?: number; zone: string }[]
   > = {}
   for (const zone of ZONE_ORDER) {
     playersByZone[zone] = []
@@ -309,19 +333,29 @@ export default function UserListPanel({ onClose }: UserListPanelProps): JSX.Elem
     const zone = playerZoneMap.get(id) || 'brainstorm'
     const role = playerRoleMap.get(id) || ''
     const status = playerStatusMap.get(id) || 'available'
+    const customStatus = playerCustomStatusMap.get(id) || ''
+    const isDnd = playerDndMap.get(id) || false
     const joinTime = playerJoinTimeMap.get(id)
     if (!playersByZone[zone]) playersByZone[zone] = []
-    playersByZone[zone].push({ id, name, role, status, isSelf: false, joinTime, zone })
+    playersByZone[zone].push({ id, name, role, status, customStatus, isDnd, isSelf: false, joinTime, zone })
   })
 
   // Ajouter le joueur local
   const game = phaserGame.scene.keys.game as Game
   const myName = game?.myPlayer?.playerName?.text || 'Moi'
   const myZone = game?.myPlayer?.currentZone || 'brainstorm'
-  const myStatus = myZone === 'deep_work' ? 'dnd' : myZone === 'afk' ? 'afk' : myZone === 'meeting' || myZone === 'sales' || myZone === 'one_on_one' ? 'meeting' : 'available'
 
   if (!playersByZone[myZone]) playersByZone[myZone] = []
-  playersByZone[myZone].unshift({ id: '_self', name: myName, role: '', status: myStatus, isSelf: true, zone: myZone })
+  playersByZone[myZone].unshift({
+    id: '_self',
+    name: myName,
+    role: '',
+    status: myStatusPreset,
+    customStatus: myStatusCustom,
+    isDnd: myDnd,
+    isSelf: true,
+    zone: myZone,
+  })
 
   const totalPlayers = playerNameMap.size + 1
 
@@ -384,7 +418,10 @@ export default function UserListPanel({ onClose }: UserListPanelProps): JSX.Elem
               </BoothStatusNote>
             )}
             {players.map((player) => {
-              const config = statusConfig[player.status] || statusConfig.available
+              // Utiliser le statut Slack-like (presets) s'il existe, sinon fallback sur le legacy
+              const presetInfo = statusConfig[player.status] || statusConfig.available
+              const dotColor = player.isDnd ? '#ef4444' : presetInfo.color
+              const statusEmoji = presetInfo.emoji || ''
               const avatarColor = getColorByString(player.name)
               const duration = player.joinTime ? formatDuration(now - player.joinTime) : ''
               const isPlayerDeepWork = player.zone === 'deep_work'
@@ -395,19 +432,25 @@ export default function UserListPanel({ onClose }: UserListPanelProps): JSX.Elem
                 >
                   <AvatarCircle $color={avatarColor}>
                     {player.name.charAt(0).toUpperCase()}
-                    <StatusDot $color={config.color} />
+                    <StatusDot $color={dotColor} />
                   </AvatarCircle>
                   <PlayerInfo>
                     <PlayerName>
+                      {statusEmoji && <span style={{ marginRight: 4 }}>{statusEmoji}</span>}
                       {player.name}
                       {player.isSelf && <SelfBadge> (vous)</SelfBadge>}
-                      {isPlayerDeepWork && (
-                        <Tooltip title="Ne pas deranger — en travail profond" arrow>
-                          <DndBadge><DndIcon>🔇</DndIcon> DND</DndBadge>
+                      {(player.isDnd || isPlayerDeepWork) && (
+                        <Tooltip title="Ne pas deranger" arrow>
+                          <DndBadge><DndIcon>&#128263;</DndIcon> DND</DndBadge>
                         </Tooltip>
                       )}
                     </PlayerName>
                     <PlayerMeta>
+                      {player.customStatus ? (
+                        <CustomStatusText>{player.customStatus}</CustomStatusText>
+                      ) : player.status !== 'available' && presetInfo.label ? (
+                        <CustomStatusText>{presetInfo.label}</CustomStatusText>
+                      ) : null}
                       {player.zone === 'afk' && (() => {
                         const reasonKey = (playerAfkReasonMap.get(player.id) || '') as typeof AFK_REASONS[number]['key']
                         const reason = afkReasonMap.get(reasonKey)

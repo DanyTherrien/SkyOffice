@@ -17,6 +17,15 @@ import {
 } from './commands/WhiteboardUpdateArrayCommand'
 import ChatMessageUpdateCommand from './commands/ChatMessageUpdateCommand'
 import { AiBotService } from '../services/AiBotService'
+import { generateToken, isCallZone } from '../services/LiveKitTokenService'
+import { saveMessage, getRecentMessages } from '../database/messages'
+import {
+  saveStickyNote,
+  deleteStickyNote as dbDeleteStickyNote,
+  getStickyNotes,
+  updateVotes as dbUpdateVotes,
+  clearStickyNotes,
+} from '../database/stickyNotes'
 
 export class SkyOffice extends Room<OfficeState> {
   private dispatcher = new Dispatcher(this)
@@ -199,6 +208,15 @@ export class SkyOffice extends Room<OfficeState> {
       this.broadcastZoneMembers(oldZone)
       this.broadcastZoneMembers(message.zone)
 
+      // Envoyer automatiquement un token LiveKit si la nouvelle zone est une zone d'appel
+      if (isCallZone(message.zone)) {
+        generateToken(player.name, client.sessionId, message.zone)
+          .then((token) => {
+            client.send(Message.LIVEKIT_TOKEN, { token, zone: message.zone })
+          })
+          .catch((err) => console.error('Erreur token LiveKit:', err))
+      }
+
       // Si le joueur entre dans la zone meeting, synchroniser les outils de reunion
       if (message.zone === 'meeting' && oldZone !== 'meeting') {
         this.syncMeetingToolsToClient(client)
@@ -220,6 +238,15 @@ export class SkyOffice extends Room<OfficeState> {
     this.onMessage(Message.UPDATE_PLAYER_STATUS, (client, message: { status: string }) => {
       const player = this.state.players.get(client.sessionId)
       if (player) player.status = message.status
+    })
+
+    // quand un joueur met a jour son statut Slack-like (preset + custom + DND)
+    this.onMessage(Message.UPDATE_STATUS, (client, message: { preset: string; custom: string; dnd: boolean }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      player.status = message.preset || 'available'
+      player.statusCustom = message.custom || ''
+      player.dnd = message.dnd ?? false
     })
 
     // quand un joueur met a jour son statut de vente (on_call, available, preparing)
@@ -247,6 +274,13 @@ export class SkyOffice extends Room<OfficeState> {
         content: message.content,
         zone,
       })
+
+      // Persister le message dans SQLite
+      try {
+        saveMessage(zone, null, player.name, message.content)
+      } catch (err) {
+        console.error('Erreur persistence message zone:', err)
+      }
 
       // Broadcaster seulement aux joueurs de la meme zone
       this.clients.forEach((cli) => {
@@ -567,6 +601,13 @@ export class SkyOffice extends Room<OfficeState> {
       }
       this.brainstormNotes.set(noteId, note)
 
+      // Persister la sticky note dans SQLite
+      try {
+        saveStickyNote(noteId, 'brainstorm', null, player.name, message.text, message.color)
+      } catch (err) {
+        console.error('Erreur persistence sticky note:', err)
+      }
+
       // Broadcaster a tous les joueurs dans la zone brainstorm
       this.broadcastToBrainstormZone(Message.STICKY_NOTE_ADDED, {
         noteId,
@@ -588,6 +629,13 @@ export class SkyOffice extends Room<OfficeState> {
 
       this.brainstormNotes.delete(message.noteId)
 
+      // Supprimer de SQLite
+      try {
+        dbDeleteStickyNote(message.noteId)
+      } catch (err) {
+        console.error('Erreur suppression sticky note:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.STICKY_NOTE_REMOVED, {
         noteId: message.noteId,
       })
@@ -607,6 +655,13 @@ export class SkyOffice extends Room<OfficeState> {
         note.votes.add(client.sessionId)
       }
 
+      // Persister les votes dans SQLite
+      try {
+        dbUpdateVotes(message.noteId, JSON.stringify(Array.from(note.votes)))
+      } catch (err) {
+        console.error('Erreur persistence votes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
         noteId: message.noteId,
         votes: note.votes.size,
@@ -624,6 +679,13 @@ export class SkyOffice extends Room<OfficeState> {
 
       note.votes.delete(client.sessionId)
 
+      // Persister les votes dans SQLite
+      try {
+        dbUpdateVotes(message.noteId, JSON.stringify(Array.from(note.votes)))
+      } catch (err) {
+        console.error('Erreur persistence votes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
         noteId: message.noteId,
         votes: note.votes.size,
@@ -637,6 +699,14 @@ export class SkyOffice extends Room<OfficeState> {
       if (!player || player.zone !== 'brainstorm') return
 
       this.brainstormNotes.clear()
+
+      // Supprimer toutes les sticky notes de la zone brainstorm dans SQLite
+      try {
+        clearStickyNotes('brainstorm')
+      } catch (err) {
+        console.error('Erreur nettoyage sticky notes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.BOARD_CLEARED, {})
     })
 
@@ -648,12 +718,36 @@ export class SkyOffice extends Room<OfficeState> {
         content: message.content,
       })
 
+      // Persister le message global dans SQLite
+      try {
+        const player = this.state.players.get(client.sessionId)
+        if (player) {
+          saveMessage('', null, player.name, message.content)
+        }
+      } catch (err) {
+        console.error('Erreur persistence message global:', err)
+      }
+
       // broadcast to all currently connected clients except the sender (to render in-game dialog on top of the character)
       this.broadcast(
         Message.ADD_CHAT_MESSAGE,
         { clientId: client.sessionId, content: message.content },
         { except: client }
       )
+    })
+
+    // Quand un joueur demande un token LiveKit pour une zone
+    this.onMessage(Message.REQUEST_LIVEKIT_TOKEN, async (client, message: { zone: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const zone = message.zone || player.zone
+      if (!isCallZone(zone)) return
+      try {
+        const token = await generateToken(player.name, client.sessionId, zone)
+        client.send(Message.LIVEKIT_TOKEN, { token, zone })
+      } catch (err) {
+        console.error('Erreur generation token LiveKit:', err)
+      }
     })
   }
 
@@ -705,6 +799,27 @@ export class SkyOffice extends Room<OfficeState> {
 
   // Envoyer toutes les sticky notes existantes a un client qui rejoint la zone brainstorm
   private syncBrainstormNotesToClient(client: Client) {
+    // Restaurer depuis la BDD si le serveur a redemarre (notes en memoire vides)
+    if (this.brainstormNotes.size === 0) {
+      try {
+        const dbNotes = getStickyNotes('brainstorm')
+        for (const n of dbNotes) {
+          const voters = JSON.parse(n.votes_json || '[]') as string[]
+          this.brainstormNotes.set(n.id, {
+            id: n.id,
+            text: n.content,
+            color: n.color,
+            authorName: n.author_name,
+            authorId: '', // Perdu apres redemarrage serveur
+            votes: new Set(voters),
+            timestamp: new Date(n.created_at).getTime(),
+          })
+        }
+      } catch (err) {
+        console.error('Erreur restauration sticky notes depuis SQLite:', err)
+      }
+    }
+
     if (this.brainstormNotes.size === 0) return
     const notes = Array.from(this.brainstormNotes.values()).map((note) => ({
       noteId: note.id,
@@ -755,9 +870,22 @@ export class SkyOffice extends Room<OfficeState> {
     return count
   }
 
-  async onAuth(_client: Client, options: { password: string | null }): Promise<boolean> {
+  async onAuth(_client: Client, options: any): Promise<boolean> {
+    // En production, verifier le JWT si Google SSO est configure
+    if (process.env.NODE_ENV === 'production' && process.env.GOOGLE_CLIENT_ID) {
+      if (!options?.token) {
+        throw new ServerError(401, 'Token d\'authentification requis')
+      }
+      try {
+        const { verifyJwt } = require('../auth/googleAuth')
+        verifyJwt(options.token)
+      } catch {
+        throw new ServerError(401, 'Token invalide')
+      }
+    }
+    // En dev ou si pas de Google Client ID configure, on accepte tout
     if (this.password) {
-      const validPassword = await bcrypt.compare(options.password, this.password)
+      const validPassword = await bcrypt.compare(options?.password, this.password)
       if (!validPassword) {
         throw new ServerError(403, 'Mot de passe incorrect !')
       }
@@ -772,6 +900,16 @@ export class SkyOffice extends Room<OfficeState> {
       name: this.name,
       description: this.description,
     })
+
+    // Envoyer l'historique de chat global depuis SQLite
+    try {
+      const globalHistory = getRecentMessages('')
+      if (globalHistory.length > 0) {
+        client.send(Message.CHAT_HISTORY, { messages: globalHistory })
+      }
+    } catch (err) {
+      console.error('Erreur chargement historique chat:', err)
+    }
 
     // Notifier les membres existants de la zone par defaut du nouveau joueur
     const player = this.state.players.get(client.sessionId)

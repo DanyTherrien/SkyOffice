@@ -10,6 +10,8 @@ export interface IPlayer extends Schema {
   zone: string
   role: string
   status: string
+  statusCustom: string
+  dnd: boolean
   afkReason: string
   salesStatus: string
   observingTarget: string

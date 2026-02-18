@@ -17,8 +17,7 @@ import {
   toggleCamera,
   setShowLeaveConfirmDialog,
 } from '../stores/MeetingStore'
-import phaserGame from '../PhaserGame'
-import Game from '../scenes/Game'
+import { liveKitService } from '../web/LiveKitService'
 
 import VideoTileGrid from './meeting/VideoTileGrid'
 import ScreenShareArea from './meeting/ScreenShareArea'
@@ -266,22 +265,14 @@ export default function ZoneMeetingOverlay(): JSX.Element | null {
     dispatch(setOverlayMinimized(false))
   }
 
-  /** Obtient le ZoneMeetingManager */
-  const getManager = () => {
-    const game = phaserGame.scene.keys.game as Game
-    return game.network.zoneMeetingManager
-  }
-
   /** Bascule le micro depuis la barre minimisee */
   const handleMiniToggleMic = () => {
-    dispatch(toggleMic())
-    getManager()?.toggleMic()
+    liveKitService.toggleMicrophone()
   }
 
   /** Bascule la camera depuis la barre minimisee */
   const handleMiniToggleCamera = () => {
-    dispatch(toggleCamera())
-    getManager()?.toggleCamera()
+    liveKitService.toggleCamera()
   }
 
   /** Empeche les clics de se propager au canvas Phaser en dessous */
