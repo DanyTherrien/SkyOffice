@@ -17,6 +17,7 @@ import {
 } from './commands/WhiteboardUpdateArrayCommand'
 import ChatMessageUpdateCommand from './commands/ChatMessageUpdateCommand'
 import { AiBotService } from '../services/AiBotService'
+import { generateToken, isCallZone } from '../services/LiveKitTokenService'
 
 export class SkyOffice extends Room<OfficeState> {
   private dispatcher = new Dispatcher(this)
@@ -198,6 +199,15 @@ export class SkyOffice extends Room<OfficeState> {
       // Broadcaster la liste des membres mise a jour pour les deux zones
       this.broadcastZoneMembers(oldZone)
       this.broadcastZoneMembers(message.zone)
+
+      // Envoyer automatiquement un token LiveKit si la nouvelle zone est une zone d'appel
+      if (isCallZone(message.zone)) {
+        generateToken(player.name, client.sessionId, message.zone)
+          .then((token) => {
+            client.send(Message.LIVEKIT_TOKEN, { token, zone: message.zone })
+          })
+          .catch((err) => console.error('Erreur token LiveKit:', err))
+      }
 
       // Si le joueur entre dans la zone meeting, synchroniser les outils de reunion
       if (message.zone === 'meeting' && oldZone !== 'meeting') {
@@ -654,6 +664,20 @@ export class SkyOffice extends Room<OfficeState> {
         { clientId: client.sessionId, content: message.content },
         { except: client }
       )
+    })
+
+    // Quand un joueur demande un token LiveKit pour une zone
+    this.onMessage(Message.REQUEST_LIVEKIT_TOKEN, async (client, message: { zone: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const zone = message.zone || player.zone
+      if (!isCallZone(zone)) return
+      try {
+        const token = await generateToken(player.name, client.sessionId, zone)
+        client.send(Message.LIVEKIT_TOKEN, { token, zone })
+      } catch (err) {
+        console.error('Erreur generation token LiveKit:', err)
+      }
     })
   }
 

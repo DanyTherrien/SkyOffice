@@ -84,4 +84,8 @@ export enum Message {
   CLEAR_BOARD,             // Client -> Server: {}
   BOARD_CLEARED,           // Server -> Client: {}
   SYNC_BOARD,              // Server -> Client: {notes: StickyNote[]}
+
+  // LiveKit video/audio
+  REQUEST_LIVEKIT_TOKEN = 'request_livekit_token',
+  LIVEKIT_TOKEN = 'livekit_token',
 }
