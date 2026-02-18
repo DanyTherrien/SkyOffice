@@ -19,6 +19,13 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
+import MicIcon from '@mui/icons-material/Mic'
+import MicOffIcon from '@mui/icons-material/MicOff'
+import VideocamIcon from '@mui/icons-material/Videocam'
+import VideocamOffIcon from '@mui/icons-material/VideocamOff'
+import ScreenShareIcon from '@mui/icons-material/ScreenShare'
+import StopScreenShareIcon from '@mui/icons-material/StopScreenShare'
+import CallEndIcon from '@mui/icons-material/CallEnd'
 
 import { BackgroundMode } from '../../../types/BackgroundMode'
 import { setShowJoystick, toggleBackgroundMode } from '../stores/UserStore'
@@ -30,6 +37,7 @@ import { useAppSelector, useAppDispatch } from '../hooks'
 import { getAvatarString, getColorByString } from '../util'
 import UserListPanel from './UserListPanel'
 import { slideUp } from '../styles/animations'
+import { liveKitService } from '../web/LiveKitService'
 
 // ─── 4B — HelperButtonGroup transforme en toolbar dock ─────────────────────
 
@@ -163,6 +171,10 @@ export default function HelperButtonGroup(): JSX.Element {
   const analyticsOpen = useAppSelector((state) => state.analytics.panelOpen)
   const badgePanelOpen = useAppSelector((state) => state.badge.showBadgePanel)
   const newBadgeId = useAppSelector((state) => state.badge.newBadgeId)
+  const activeZone = useAppSelector((state) => state.meeting.activeZone)
+  const micEnabled = useAppSelector((state) => state.meeting.micEnabled)
+  const cameraEnabled = useAppSelector((state) => state.meeting.cameraEnabled)
+  const myScreenStream = useAppSelector((state) => state.meeting.myScreenStream)
   const dispatch = useAppDispatch()
 
   const closeAll = () => {
@@ -338,6 +350,54 @@ export default function HelperButtonGroup(): JSX.Element {
                 </DockButton>
               )}
             </Tooltip>
+            {/* ─── Controles d'appel (visibles uniquement en reunion) ─── */}
+            {activeZone && (
+              <>
+                <Separator />
+                <Tooltip title={micEnabled ? 'Couper le micro' : 'Activer le micro'} placement="top">
+                  {micEnabled ? (
+                    <ActiveDockButton size="small" onClick={() => liveKitService.toggleMicrophone()}>
+                      <MicIcon />
+                    </ActiveDockButton>
+                  ) : (
+                    <DockButton size="small" onClick={() => liveKitService.toggleMicrophone()}>
+                      <MicOffIcon />
+                    </DockButton>
+                  )}
+                </Tooltip>
+                <Tooltip title={cameraEnabled ? 'Desactiver la camera' : 'Activer la camera'} placement="top">
+                  {cameraEnabled ? (
+                    <ActiveDockButton size="small" onClick={() => liveKitService.toggleCamera()}>
+                      <VideocamIcon />
+                    </ActiveDockButton>
+                  ) : (
+                    <DockButton size="small" onClick={() => liveKitService.toggleCamera()}>
+                      <VideocamOffIcon />
+                    </DockButton>
+                  )}
+                </Tooltip>
+                <Tooltip title={myScreenStream ? 'Arreter le partage' : 'Partager l\'ecran'} placement="top">
+                  {myScreenStream ? (
+                    <ActiveDockButton size="small" onClick={() => liveKitService.stopScreenShare()}>
+                      <StopScreenShareIcon />
+                    </ActiveDockButton>
+                  ) : (
+                    <DockButton size="small" onClick={() => liveKitService.startScreenShare()}>
+                      <ScreenShareIcon />
+                    </DockButton>
+                  )}
+                </Tooltip>
+                <Tooltip title="Quitter l'appel" placement="top">
+                  <DockButton
+                    size="small"
+                    onClick={() => liveKitService.disconnect()}
+                    sx={{ '&&': { color: '#ef4444', '&:hover': { background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' } } }}
+                  >
+                    <CallEndIcon />
+                  </DockButton>
+                </Tooltip>
+              </>
+            )}
             <Separator />
             <Tooltip title={showJoystick ? 'Desactiver le joystick' : 'Activer le joystick'} placement="top">
               <DockButton size="small" onClick={() => dispatch(setShowJoystick(!showJoystick))}>

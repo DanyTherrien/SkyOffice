@@ -30,8 +30,11 @@ import {
   removePeerConnectionState,
   setPeerSpeaking,
 } from '../stores/MeetingStore'
+import { openMediaSettings } from '../stores/MediaSettingsStore'
 import { clearMeetingTools } from '../stores/MeetingToolsStore'
 import { Message } from '../../../types/Messages'
+
+const MEDIA_SETUP_DONE_KEY = 'capturia-media-setup-done'
 
 /**
  * Service singleton gerant la connexion LiveKit pour les reunions de zone.
@@ -45,6 +48,10 @@ export class LiveKitService {
   private currentZone: string | null = null
   /** Fonction pour envoyer un message au serveur Colyseus (injectee via setMessageSender) */
   private sendMessage: ((type: Message, data?: any) => void) | null = null
+
+  /** Token et zone en attente de confirmation media (premiere connexion) */
+  private pendingToken: string | null = null
+  private pendingZone: string | null = null
 
   constructor() {
     this.room = this.createRoom()
@@ -75,6 +82,8 @@ export class LiveKitService {
 
   /**
    * Se connecte a la room LiveKit avec le token fourni par le serveur.
+   * Si c'est la premiere connexion, ouvre d'abord le dialog de parametres media
+   * pour que l'utilisateur puisse verifier sa camera/micro avant de joindre.
    * Publie automatiquement la camera et le micro selon les preferences utilisateur.
    */
   async connect(token: string, zone: string): Promise<void> {
@@ -83,6 +92,22 @@ export class LiveKitService {
       await this.disconnect()
     }
 
+    // Premiere connexion: ouvrir le dialog media pour verification camera/micro
+    if (!localStorage.getItem(MEDIA_SETUP_DONE_KEY)) {
+      console.log('[LiveKit] Premiere connexion — ouverture des parametres media')
+      this.pendingToken = token
+      this.pendingZone = zone
+      store.dispatch(openMediaSettings())
+      return
+    }
+
+    await this.doConnect(token, zone)
+  }
+
+  /**
+   * Execute la connexion effective a LiveKit (appele directement ou apres validation media).
+   */
+  private async doConnect(token: string, zone: string): Promise<void> {
     const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL as string
     if (!liveKitUrl) {
       console.error('[LiveKit] VITE_LIVEKIT_URL non defini')
@@ -99,6 +124,9 @@ export class LiveKitService {
       await this.room.connect(liveKitUrl, token)
       console.log('[LiveKit] Connecte a la room:', zone)
 
+      // Marquer la configuration media comme effectuee
+      localStorage.setItem(MEDIA_SETUP_DONE_KEY, 'true')
+
       // Publier les pistes locales (camera + micro)
       await this.publishLocalTracks()
     } catch (error) {
@@ -109,6 +137,27 @@ export class LiveKitService {
       this.currentZone = null
       store.dispatch(clearMeetingState())
     }
+  }
+
+  /**
+   * Poursuit la connexion LiveKit apres la fermeture du dialog de parametres media.
+   * Appele par MediaSettingsDialog lors de la fermeture si un token est en attente.
+   */
+  async proceedWithPendingConnect(): Promise<void> {
+    if (this.pendingToken && this.pendingZone) {
+      const token = this.pendingToken
+      const zone = this.pendingZone
+      this.pendingToken = null
+      this.pendingZone = null
+      // Marquer comme fait avant de connecter (eviter la boucle)
+      localStorage.setItem(MEDIA_SETUP_DONE_KEY, 'true')
+      await this.doConnect(token, zone)
+    }
+  }
+
+  /** Retourne true si une connexion est en attente de validation media */
+  get hasPendingConnect(): boolean {
+    return this.pendingToken !== null && this.pendingZone !== null
   }
 
   /**

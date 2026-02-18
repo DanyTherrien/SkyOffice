@@ -332,6 +332,13 @@ export default function MediaSettingsDialog(): JSX.Element | null {
     stopPreview()
     dispatch(closeMediaSettings())
 
+    // Si une connexion LiveKit est en attente (premiere entree en zone),
+    // poursuivre la connexion maintenant que l'utilisateur a vu ses parametres media
+    if (liveKitService.hasPendingConnect) {
+      liveKitService.proceedWithPendingConnect()
+      return
+    }
+
     // Appliquer au service LiveKit si en reunion
     if (activeZone && activeZone !== 'deep_work') {
       try {
