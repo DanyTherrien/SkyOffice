@@ -377,6 +377,30 @@ export default class Network {
       store.dispatch(setJoinedRoomData(content))
     })
 
+    // Historique de chat depuis SQLite (envoye au join)
+    this.room.onMessage(
+      Message.CHAT_HISTORY,
+      (data: {
+        messages: Array<{
+          sender_name: string
+          content: string
+          zone: string
+          created_at: string
+        }>
+      }) => {
+        for (const msg of data.messages) {
+          store.dispatch(
+            pushChatMessage({
+              author: msg.sender_name,
+              content: msg.content,
+              createdAt: new Date(msg.created_at).getTime(),
+              zone: msg.zone,
+            } as any)
+          )
+        }
+      }
+    )
+
     // when a user sends a message
     this.room.onMessage(Message.ADD_CHAT_MESSAGE, ({ clientId, content }) => {
       phaserEvents.emit(Event.UPDATE_DIALOG_BUBBLE, clientId, content)

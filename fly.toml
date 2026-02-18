@@ -10,6 +10,7 @@ primary_region = 'yyz'
 [env]
   PORT = '2567'
   NODE_ENV = 'production'
+  DB_PATH = '/data/capturia.db'
 
 [http_service]
   internal_port = 2567
@@ -25,6 +26,10 @@ primary_region = 'yyz'
     grace_period = '10s'
     method = 'GET'
     path = '/health'
+
+[mounts]
+  source = 'capturia_data'
+  destination = '/data'
 
 [[vm]]
   memory = '512mb'

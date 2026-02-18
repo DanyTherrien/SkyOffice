@@ -18,6 +18,14 @@ import {
 import ChatMessageUpdateCommand from './commands/ChatMessageUpdateCommand'
 import { AiBotService } from '../services/AiBotService'
 import { generateToken, isCallZone } from '../services/LiveKitTokenService'
+import { saveMessage, getRecentMessages } from '../database/messages'
+import {
+  saveStickyNote,
+  deleteStickyNote as dbDeleteStickyNote,
+  getStickyNotes,
+  updateVotes as dbUpdateVotes,
+  clearStickyNotes,
+} from '../database/stickyNotes'
 
 export class SkyOffice extends Room<OfficeState> {
   private dispatcher = new Dispatcher(this)
@@ -257,6 +265,13 @@ export class SkyOffice extends Room<OfficeState> {
         content: message.content,
         zone,
       })
+
+      // Persister le message dans SQLite
+      try {
+        saveMessage(zone, null, player.name, message.content)
+      } catch (err) {
+        console.error('Erreur persistence message zone:', err)
+      }
 
       // Broadcaster seulement aux joueurs de la meme zone
       this.clients.forEach((cli) => {
@@ -577,6 +592,13 @@ export class SkyOffice extends Room<OfficeState> {
       }
       this.brainstormNotes.set(noteId, note)
 
+      // Persister la sticky note dans SQLite
+      try {
+        saveStickyNote(noteId, 'brainstorm', null, player.name, message.text, message.color)
+      } catch (err) {
+        console.error('Erreur persistence sticky note:', err)
+      }
+
       // Broadcaster a tous les joueurs dans la zone brainstorm
       this.broadcastToBrainstormZone(Message.STICKY_NOTE_ADDED, {
         noteId,
@@ -598,6 +620,13 @@ export class SkyOffice extends Room<OfficeState> {
 
       this.brainstormNotes.delete(message.noteId)
 
+      // Supprimer de SQLite
+      try {
+        dbDeleteStickyNote(message.noteId)
+      } catch (err) {
+        console.error('Erreur suppression sticky note:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.STICKY_NOTE_REMOVED, {
         noteId: message.noteId,
       })
@@ -617,6 +646,13 @@ export class SkyOffice extends Room<OfficeState> {
         note.votes.add(client.sessionId)
       }
 
+      // Persister les votes dans SQLite
+      try {
+        dbUpdateVotes(message.noteId, JSON.stringify(Array.from(note.votes)))
+      } catch (err) {
+        console.error('Erreur persistence votes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
         noteId: message.noteId,
         votes: note.votes.size,
@@ -634,6 +670,13 @@ export class SkyOffice extends Room<OfficeState> {
 
       note.votes.delete(client.sessionId)
 
+      // Persister les votes dans SQLite
+      try {
+        dbUpdateVotes(message.noteId, JSON.stringify(Array.from(note.votes)))
+      } catch (err) {
+        console.error('Erreur persistence votes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
         noteId: message.noteId,
         votes: note.votes.size,
@@ -647,6 +690,14 @@ export class SkyOffice extends Room<OfficeState> {
       if (!player || player.zone !== 'brainstorm') return
 
       this.brainstormNotes.clear()
+
+      // Supprimer toutes les sticky notes de la zone brainstorm dans SQLite
+      try {
+        clearStickyNotes('brainstorm')
+      } catch (err) {
+        console.error('Erreur nettoyage sticky notes:', err)
+      }
+
       this.broadcastToBrainstormZone(Message.BOARD_CLEARED, {})
     })
 
@@ -657,6 +708,16 @@ export class SkyOffice extends Room<OfficeState> {
         client,
         content: message.content,
       })
+
+      // Persister le message global dans SQLite
+      try {
+        const player = this.state.players.get(client.sessionId)
+        if (player) {
+          saveMessage('', null, player.name, message.content)
+        }
+      } catch (err) {
+        console.error('Erreur persistence message global:', err)
+      }
 
       // broadcast to all currently connected clients except the sender (to render in-game dialog on top of the character)
       this.broadcast(
@@ -729,6 +790,27 @@ export class SkyOffice extends Room<OfficeState> {
 
   // Envoyer toutes les sticky notes existantes a un client qui rejoint la zone brainstorm
   private syncBrainstormNotesToClient(client: Client) {
+    // Restaurer depuis la BDD si le serveur a redemarre (notes en memoire vides)
+    if (this.brainstormNotes.size === 0) {
+      try {
+        const dbNotes = getStickyNotes('brainstorm')
+        for (const n of dbNotes) {
+          const voters = JSON.parse(n.votes_json || '[]') as string[]
+          this.brainstormNotes.set(n.id, {
+            id: n.id,
+            text: n.content,
+            color: n.color,
+            authorName: n.author_name,
+            authorId: '', // Perdu apres redemarrage serveur
+            votes: new Set(voters),
+            timestamp: new Date(n.created_at).getTime(),
+          })
+        }
+      } catch (err) {
+        console.error('Erreur restauration sticky notes depuis SQLite:', err)
+      }
+    }
+
     if (this.brainstormNotes.size === 0) return
     const notes = Array.from(this.brainstormNotes.values()).map((note) => ({
       noteId: note.id,
@@ -809,6 +891,16 @@ export class SkyOffice extends Room<OfficeState> {
       name: this.name,
       description: this.description,
     })
+
+    // Envoyer l'historique de chat global depuis SQLite
+    try {
+      const globalHistory = getRecentMessages('')
+      if (globalHistory.length > 0) {
+        client.send(Message.CHAT_HISTORY, { messages: globalHistory })
+      }
+    } catch (err) {
+      console.error('Erreur chargement historique chat:', err)
+    }
 
     // Notifier les membres existants de la zone par defaut du nouveau joueur
     const player = this.state.players.get(client.sessionId)

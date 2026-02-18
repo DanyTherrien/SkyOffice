@@ -88,4 +88,7 @@ export enum Message {
   // LiveKit video/audio
   REQUEST_LIVEKIT_TOKEN = 'request_livekit_token',
   LIVEKIT_TOKEN = 'livekit_token',
+
+  // Persistance SQLite — historique de chat
+  CHAT_HISTORY = 'chat_history',
 }
