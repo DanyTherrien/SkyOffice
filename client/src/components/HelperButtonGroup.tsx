@@ -36,6 +36,7 @@ import { toggleBadgePanel } from '../stores/BadgeStore'
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { getAvatarString, getColorByString } from '../util'
 import UserListPanel from './UserListPanel'
+import StatusPicker, { STATUS_PRESET_MAP } from './StatusPicker'
 import { slideUp } from '../styles/animations'
 import { liveKitService } from '../web/LiveKitService'
 
@@ -157,10 +158,42 @@ const RoomInfoRow = styled.div`
   margin: 4px 0;
 `
 
+// Styled-component pour le bouton de statut dans le dock
+const StatusButton = styled(Fab)<{ $dotColor: string }>`
+  && {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    background: transparent;
+    box-shadow: none;
+    color: #aaa;
+    transition: all 0.15s;
+    position: relative;
+    font-size: 14px;
+
+    &:hover {
+      background: rgba(20, 184, 166, 0.1);
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: ${({ $dotColor }) => $dotColor};
+      border: 1.5px solid #1a1e30;
+    }
+  }
+`
+
 export default function HelperButtonGroup(): JSX.Element {
   const [showControlGuide, setShowControlGuide] = useState(false)
   const [showRoomInfo, setShowRoomInfo] = useState(false)
   const [showUserList, setShowUserList] = useState(false)
+  const [statusAnchorEl, setStatusAnchorEl] = useState<HTMLElement | null>(null)
   const showJoystick = useAppSelector((state) => state.user.showJoystick)
   const backgroundMode = useAppSelector((state) => state.user.backgroundMode)
   const roomJoined = useAppSelector((state) => state.room.roomJoined)
@@ -171,6 +204,8 @@ export default function HelperButtonGroup(): JSX.Element {
   const analyticsOpen = useAppSelector((state) => state.analytics.panelOpen)
   const badgePanelOpen = useAppSelector((state) => state.badge.showBadgePanel)
   const newBadgeId = useAppSelector((state) => state.badge.newBadgeId)
+  const myStatusPreset = useAppSelector((state) => state.user.myStatusPreset)
+  const myDnd = useAppSelector((state) => state.user.myDnd)
   const activeZone = useAppSelector((state) => state.meeting.activeZone)
   const micEnabled = useAppSelector((state) => state.meeting.micEnabled)
   const cameraEnabled = useAppSelector((state) => state.meeting.cameraEnabled)
@@ -255,6 +290,18 @@ export default function HelperButtonGroup(): JSX.Element {
                   </Badge>
                 </DockButton>
               )}
+            </Tooltip>
+            <Tooltip title="Mon statut" placement="top">
+              <StatusButton
+                size="small"
+                $dotColor={myDnd ? '#ef4444' : (STATUS_PRESET_MAP.get(myStatusPreset)?.color || '#4ade80')}
+                onClick={(e) => {
+                  setStatusAnchorEl(statusAnchorEl ? null : e.currentTarget as HTMLElement)
+                  closeAll()
+                }}
+              >
+                {STATUS_PRESET_MAP.get(myStatusPreset)?.emoji || '\u2B24'}
+              </StatusButton>
             </Tooltip>
             <Tooltip title="Info salle" placement="top">
               {showRoomInfo ? (
@@ -415,6 +462,9 @@ export default function HelperButtonGroup(): JSX.Element {
 
       {/* User list panel */}
       {showUserList && <UserListPanel onClose={() => setShowUserList(false)} />}
+
+      {/* Status picker popover */}
+      <StatusPicker anchorEl={statusAnchorEl} onClose={() => setStatusAnchorEl(null)} />
     </>
   )
 }

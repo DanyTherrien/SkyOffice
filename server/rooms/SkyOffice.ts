@@ -240,6 +240,15 @@ export class SkyOffice extends Room<OfficeState> {
       if (player) player.status = message.status
     })
 
+    // quand un joueur met a jour son statut Slack-like (preset + custom + DND)
+    this.onMessage(Message.UPDATE_STATUS, (client, message: { preset: string; custom: string; dnd: boolean }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      player.status = message.preset || 'available'
+      player.statusCustom = message.custom || ''
+      player.dnd = message.dnd ?? false
+    })
+
     // quand un joueur met a jour son statut de vente (on_call, available, preparing)
     this.onMessage(Message.UPDATE_SALES_STATUS, (client, message: { salesStatus: string }) => {
       const player = this.state.players.get(client.sessionId)

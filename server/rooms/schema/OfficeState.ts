@@ -17,6 +17,8 @@ export class Player extends Schema implements IPlayer {
   @type('string') zone = 'brainstorm'
   @type('string') role = ''
   @type('string') status = 'available'
+  @type('string') statusCustom = ''
+  @type('boolean') dnd = false
   @type('string') afkReason = ''
   @type('string') salesStatus = ''  // 'on_call' | 'available' | 'preparing' | ''
   @type('string') observingTarget = ''  // sessionId du joueur observe (vide si pas en observation)

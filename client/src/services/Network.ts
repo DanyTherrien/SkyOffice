@@ -20,6 +20,11 @@ import {
   removePlayerAfkReasonMap,
   setPlayerSalesStatusMap,
   removePlayerSalesStatusMap,
+  setPlayerCustomStatusMap,
+  removePlayerCustomStatusMap,
+  setPlayerDndMap,
+  removePlayerDndMap,
+  setMyStatus,
   setPlayerJoinTime,
   removePlayerJoinTime,
 } from '../stores/UserStore'
@@ -299,6 +304,16 @@ export default class Network {
             store.dispatch(setPlayerStatusMap({ id: key, status: value }))
           }
 
+          // Dispatcher les changements de statut personnalise au Redux store
+          if (field === 'statusCustom' && typeof value === 'string') {
+            store.dispatch(setPlayerCustomStatusMap({ id: key, custom: value }))
+          }
+
+          // Dispatcher les changements de DND au Redux store
+          if (field === 'dnd' && typeof value === 'boolean') {
+            store.dispatch(setPlayerDndMap({ id: key, dnd: value }))
+          }
+
           // Dispatcher les changements de raison AFK au Redux store
           if (field === 'afkReason' && typeof value === 'string') {
             store.dispatch(setPlayerAfkReasonMap({ id: key, reason: value }))
@@ -323,6 +338,8 @@ export default class Network {
       store.dispatch(removePlayerZoneMap(key))
       store.dispatch(removePlayerRoleMap(key))
       store.dispatch(removePlayerStatusMap(key))
+      store.dispatch(removePlayerCustomStatusMap(key))
+      store.dispatch(removePlayerDndMap(key))
       store.dispatch(removePlayerAfkReasonMap(key))
       store.dispatch(removePlayerSalesStatusMap(key))
       store.dispatch(removePlayerJoinTime(key))
@@ -809,6 +826,28 @@ export default class Network {
   // Envoyer le statut du joueur au serveur (available, meeting, dnd)
   updatePlayerStatus(status: string): void {
     this.room?.send(Message.UPDATE_PLAYER_STATUS, { status })
+  }
+
+  // Envoyer le statut Slack-like complet au serveur (preset + custom + DND)
+  updateStatus(preset: string, custom: string, dnd: boolean): void {
+    this.room?.send(Message.UPDATE_STATUS, { preset, custom, dnd })
+    store.dispatch(setMyStatus({ preset, custom, dnd, autoSet: false }))
+  }
+
+  // Auto-detecter le statut en fonction de la zone (seulement si le statut n'a pas ete manuellement defini)
+  autoDetectStatusFromZone(zone: string): void {
+    const state = store.getState().user
+    // Ne pas override un statut manuellement defini
+    if (!state.myStatusAutoSet && state.myStatusPreset !== 'available') return
+
+    let preset = 'available'
+    if (zone === 'meeting' || zone === 'one_on_one') preset = 'in_meeting'
+    else if (zone === 'deep_work') preset = 'focusing'
+
+    const dnd = zone === 'deep_work'
+
+    this.room?.send(Message.UPDATE_STATUS, { preset, custom: '', dnd })
+    store.dispatch(setMyStatus({ preset, custom: '', dnd, autoSet: true }))
   }
 
   // Envoyer la raison AFK au serveur

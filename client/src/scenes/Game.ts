@@ -30,6 +30,7 @@ import {
 import { pushToast } from '../stores/ToastStore'
 import { NavKeys, Keyboard } from '../../../types/KeyboardState'
 import { sanitizeId } from '../util'
+import { STATUS_PRESET_MAP } from '../components/StatusPicker'
 import { ZONE_NAMES, MEETING_ZONES } from '../constants'
 import { liveKitService } from '../web/LiveKitService'
 import LightingManager from './LightingManager'
@@ -918,6 +919,8 @@ export default class Game extends Phaser.Scene {
             } else {
               this.network.updatePlayerStatus('available')
             }
+            // Auto-detecter le statut Slack-like en fonction de la zone
+            this.network.autoDetectStatusFromZone(name)
             // Mettre a jour l'eclairage, les particules et l'audio de zone
             this.lightingManager.setZone(name)
             this.particleManager.onZoneChanged(
@@ -974,14 +977,20 @@ export default class Game extends Phaser.Scene {
       const meetingState = store.getState().meeting
 
       const myId = sanitizeId(this.network.mySessionId)
-      this.myPlayer.updateStatusDot(userState.playerStatusMap.get(myId) || 'available')
+      const myStatus = userState.playerStatusMap.get(myId) || 'available'
+      this.myPlayer.updateStatusDot(myStatus)
+      this.myPlayer.updateStatusEmoji(STATUS_PRESET_MAP.get(userState.myStatusPreset)?.emoji || '')
       this.myPlayer.updateMeetingIcon(false)
       // 3A — Animer le typing indicator du joueur local
       this.myPlayer.updateTypingAnimation()
 
       for (const [sessionId, otherPlayer] of this.otherPlayerMap) {
         const sid = sanitizeId(sessionId)
-        otherPlayer.updateStatusDot(userState.playerStatusMap.get(sid) || 'available')
+        const otherStatus = userState.playerStatusMap.get(sid) || 'available'
+        otherPlayer.updateStatusDot(otherStatus)
+        // Afficher l'emoji de statut Slack-like au-dessus de l'avatar
+        const otherStatusPreset = STATUS_PRESET_MAP.get(otherStatus)
+        otherPlayer.updateStatusEmoji(otherStatusPreset?.emoji || '')
         const inMyMeeting =
           meetingState.activeZone !== null && meetingState.zoneMemberIds.includes(sid)
         otherPlayer.updateMeetingIcon(inMyMeeting)

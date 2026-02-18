@@ -28,7 +28,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   // Indicateurs visuels de statut
   private playerStatusDot: Phaser.GameObjects.Graphics
   private playerMeetingIcon: Phaser.GameObjects.Text
+  private playerStatusEmoji: Phaser.GameObjects.Text
   private currentStatus = ''
+  private currentStatusEmoji = ''
   private isInMyMeeting = false
 
   // 3A — Cercle avatar colore (premiere lettre du nom)
@@ -135,11 +137,19 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Icone camera au-dessus du nom (visible si le joueur est dans la meme reunion)
     this.playerMeetingIcon = this.scene.add
-      .text(0, -18, '📷')
+      .text(0, -18, '\uD83D\uDCF7')
       .setFontSize(14)
       .setOrigin(0.5)
       .setVisible(false)
     this.playerContainer.add(this.playerMeetingIcon)
+
+    // Emoji de statut au-dessus du nom (visible si statut non-disponible)
+    this.playerStatusEmoji = this.scene.add
+      .text(0, -18, '')
+      .setFontSize(12)
+      .setOrigin(0.5)
+      .setVisible(false)
+    this.playerContainer.add(this.playerStatusEmoji)
 
     // Cercle pulsant pour indiquer la parole active
     this.speakingIndicator = this.scene.add.graphics()
@@ -274,6 +284,21 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     const dotX = -this.playerName.width / 2 - 12
     this.playerStatusDot.fillStyle(color, 1.0)
     this.playerStatusDot.fillCircle(dotX, 0, 4)
+  }
+
+  /** Met a jour l'emoji de statut au-dessus du nom */
+  updateStatusEmoji(emoji: string): void {
+    if (this.currentStatusEmoji === emoji) return
+    this.currentStatusEmoji = emoji
+    if (emoji) {
+      this.playerStatusEmoji.setText(emoji)
+      this.playerStatusEmoji.setVisible(true)
+      // Positionner a droite du nom
+      const xPos = this.playerName.width / 2 + 12
+      this.playerStatusEmoji.setPosition(xPos, 0)
+    } else {
+      this.playerStatusEmoji.setVisible(false)
+    }
   }
 
   /** Affiche ou cache l'icone camera (collegue dans la meme reunion) */

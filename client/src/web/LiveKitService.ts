@@ -32,6 +32,7 @@ import {
 } from '../stores/MeetingStore'
 import { openMediaSettings } from '../stores/MediaSettingsStore'
 import { clearMeetingTools } from '../stores/MeetingToolsStore'
+import { pushToast } from '../stores/ToastStore'
 import { Message } from '../../../types/Messages'
 
 const MEDIA_SETUP_DONE_KEY = 'capturia-media-setup-done'
@@ -87,6 +88,16 @@ export class LiveKitService {
    * Publie automatiquement la camera et le micro selon les preferences utilisateur.
    */
   async connect(token: string, zone: string): Promise<void> {
+    // Bloquer la connexion si le mode Ne pas deranger est actif
+    const userState = store.getState().user
+    if (userState.myDnd) {
+      console.log('[LiveKit] Connexion bloquee — mode Ne pas deranger actif')
+      store.dispatch(
+        pushToast({ message: 'Mode Ne pas deranger actif — appel bloque', type: 'warning' })
+      )
+      return
+    }
+
     // Si deja connecte a une autre zone, deconnecter d'abord
     if (this.currentZone !== null) {
       await this.disconnect()
