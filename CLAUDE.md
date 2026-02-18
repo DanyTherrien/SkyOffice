@@ -7,7 +7,7 @@ Base sur le projet open-source SkyOffice (MIT) — fork customise.
 ## Stack technique
 - **Frontend**: React 18 + Redux Toolkit + Phaser 3.55 (TypeScript)
 - **Backend**: Node.js + Express + Colyseus 0.14 (WebSocket)
-- **Video/Audio**: PeerJS 1.3.2 (WebRTC, chat de proximite)
+- **Video/Audio**: LiveKit (WebRTC SFU, video/audio/screen share)
 - **Build**: Vite 3.0.9
 - **UI**: Material-UI 5 + Emotion + Styled Components
 - **Carte**: Tiled Map Editor (.tmx → .json)
@@ -15,10 +15,13 @@ Base sur le projet open-source SkyOffice (MIT) — fork customise.
 
 ## Comment lancer le projet
 ```bash
-# Terminal 1 — Serveur (port 2567)
-yarn start
+# Terminal 1 — LiveKit (port 7880) — requiert Docker
+docker compose up livekit
 
-# Terminal 2 — Client (port 5173)
+# Terminal 2 — Serveur (port 2567)
+LIVEKIT_API_KEY=devkey LIVEKIT_API_SECRET=devsecret yarn start
+
+# Terminal 3 — Client (port 5173)
 cd client && yarn dev
 ```
 Ouvrir http://localhost:5173
