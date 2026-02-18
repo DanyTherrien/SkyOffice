@@ -20,7 +20,7 @@ const CreateRoomFormWrapper = styled.form`
   gap: 20px;
 `
 
-export const CreateRoomForm = () => {
+export const CreateRoomForm = (): JSX.Element => {
   const [values, setValues] = useState<IRoomData>({
     name: '',
     description: '',

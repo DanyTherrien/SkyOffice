@@ -49,7 +49,7 @@ const angleToDirections = (angle: number): Direction => {
   return outObj
 }
 
-const JoystickItem = (props: Props) => {
+const JoystickItem = (props: Props): JSX.Element => {
   return (
     <Joystick
       size={75}

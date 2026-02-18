@@ -10,7 +10,7 @@ type Payload = {
 }
 
 export default class ChatMessageUpdateCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, content, zone } = data
     const player = this.room.state.players.get(client.sessionId)
     const chatMessages = this.room.state.chatMessages

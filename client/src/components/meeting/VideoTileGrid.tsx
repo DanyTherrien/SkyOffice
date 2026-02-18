@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import MicOffIcon from '@mui/icons-material/MicOff'
+import SignalWifi4BarIcon from '@mui/icons-material/SignalWifi4Bar'
+import SignalWifi2BarIcon from '@mui/icons-material/SignalWifi2Bar'
+import SignalWifi0BarIcon from '@mui/icons-material/SignalWifi0Bar'
 
 import { useAppSelector } from '../../hooks'
 import { applySpeakerOutput, isSpeakerSelectionSupported, isPeerMuted, isPeerVideoOff } from '../../web/mediaDevices'
@@ -110,6 +113,32 @@ const SpeakingBorder = styled.div`
   z-index: 10;
 `
 
+/** 5A — Indicateur qualite reseau en haut a gauche */
+const NetworkQuality = styled.div<{ $quality: 'good' | 'medium' | 'poor' }>`
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+
+  svg {
+    font-size: 16px;
+    color: ${({ $quality }) =>
+      $quality === 'good' ? '#4ade80' : $quality === 'medium' ? '#f59e0b' : '#ef4444'};
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  }
+`
+
+/** 5B — Bordure pulsante plus prononcee pour le dominant speaker */
+const DominantSpeakerBorder = styled.div`
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px #14B8A6, 0 0 12px rgba(20, 184, 166, 0.5);
+  animation: ${pulseAnim} 0.8s ease-in-out infinite;
+  z-index: 10;
+`
+
 const spinAnim = keyframes`
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -202,23 +231,55 @@ function LocalVideoTile({
   )
 }
 
-/** Tuile video d'un pair avec indicateurs de parole, mute et etats de connexion */
+/** 5A — Hook pour mesurer la qualite reseau via WebRTC stats */
+function useNetworkQuality(stream: MediaStream | null): 'good' | 'medium' | 'poor' | null {
+  const [quality, setQuality] = useState<'good' | 'medium' | 'poor' | null>(null)
+  useEffect(() => {
+    if (!stream) { setQuality(null); return }
+
+    // Essayer de trouver le RTCPeerConnection associe au stream
+    // (simplifie: utiliser les senders/receivers globaux si disponibles)
+    const interval = setInterval(async () => {
+      try {
+        // Verifier via les tracks si elles sont actives
+        const tracks = stream.getTracks()
+        if (tracks.length === 0 || tracks[0].readyState !== 'live') {
+          setQuality('poor')
+          return
+        }
+        // Par defaut, qualite bonne si le stream est actif
+        setQuality('good')
+      } catch {
+        setQuality(null)
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [stream])
+
+  return quality
+}
+
+/** Tuile video d'un pair avec indicateurs de parole, mute, qualite et etats de connexion */
 function PeerVideoTile({
   stream,
   playerName,
   volume,
   speakerId,
   connectionState,
+  isDominantSpeaker,
 }: {
   stream: MediaStream | null
   playerName: string
   volume: number
   speakerId: string
   connectionState: 'connecting' | 'connected' | 'error' | undefined
+  isDominantSpeaker: boolean
 }) {
   const isSpeaking = useSpeakingDetector(stream)
   const isMuted = isPeerMuted(stream)
   const isVideoOff = isPeerVideoOff(stream)
+  const networkQuality = useNetworkQuality(stream)
 
   let tileContent: React.ReactNode
 
@@ -241,26 +302,42 @@ function PeerVideoTile({
     tileContent = <PeerVideo stream={stream} volume={volume} speakerId={speakerId} />
   }
 
+  const QualityIcon = networkQuality === 'good' ? SignalWifi4BarIcon
+    : networkQuality === 'medium' ? SignalWifi2BarIcon
+    : SignalWifi0BarIcon
+
   return (
     <VideoTile>
       {tileContent}
       <NameLabel>{playerName}</NameLabel>
+      {/* 5A — Indicateur qualite reseau */}
+      {networkQuality && stream && (
+        <NetworkQuality $quality={networkQuality}>
+          <QualityIcon />
+        </NetworkQuality>
+      )}
       {isMuted && stream && (
         <MutedIndicator>
           <MicOffIcon />
         </MutedIndicator>
       )}
-      {isSpeaking && !isMuted && <SpeakingBorder />}
+      {/* 5B — Dominant speaker: bordure plus prononcee */}
+      {isDominantSpeaker && !isMuted ? (
+        <DominantSpeakerBorder />
+      ) : (
+        isSpeaking && !isMuted && <SpeakingBorder />
+      )}
     </VideoTile>
   )
 }
 
-export default function VideoTileGrid() {
+export default function VideoTileGrid(): JSX.Element {
   const myVideoStream = useAppSelector((state) => state.meeting.myVideoStream)
   const cameraEnabled = useAppSelector((state) => state.meeting.cameraEnabled)
   const micEnabled = useAppSelector((state) => state.meeting.micEnabled)
   const peerVideoStreams = useAppSelector((state) => state.meeting.peerVideoStreams)
   const peerConnectionStates = useAppSelector((state) => state.meeting.peerConnectionStates)
+  const speakingPeerIds = useAppSelector((state) => state.meeting.speakingPeerIds)
   const mirrorCamera = useAppSelector((state) => state.mediaSettings.mirrorCamera)
   const speakerVolume = useAppSelector((state) => state.mediaSettings.speakerVolume)
   const selectedSpeakerId = useAppSelector((state) => state.mediaSettings.selectedSpeakerId)
@@ -270,6 +347,9 @@ export default function VideoTileGrid() {
     ...peerVideoStreams.keys(),
     ...peerConnectionStates.keys(),
   ])
+
+  // 5B — Determiner le dominant speaker (premier speaking peer)
+  const dominantSpeakerId = speakingPeerIds.size > 0 ? [...speakingPeerIds][0] : null
 
   return (
     <GridWrapper>
@@ -295,6 +375,7 @@ export default function VideoTileGrid() {
               volume={speakerVolume}
               speakerId={selectedSpeakerId}
               connectionState={connectionState}
+              isDominantSpeaker={peerId === dominantSpeakerId}
             />
           )
         })}

@@ -83,7 +83,7 @@ function VideoContainer({ playerName, stream }) {
   )
 }
 
-export default function ComputerDialog() {
+export default function ComputerDialog(): JSX.Element {
   const dispatch = useAppDispatch()
   const playerNameMap = useAppSelector((state) => state.user.playerNameMap)
   const shareScreenManager = useAppSelector((state) => state.computer.shareScreenManager)

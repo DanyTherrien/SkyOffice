@@ -6,6 +6,7 @@ import Player from './Player'
 import Network from '../services/Network'
 import Chair from '../items/Chair'
 import Computer from '../items/Computer'
+import Door from '../items/Door'
 import Whiteboard from '../items/Whiteboard'
 
 import { phaserEvents, Event } from '../events/EventCenter'
@@ -19,6 +20,17 @@ export default class MyPlayer extends Player {
   private playContainerBody: Phaser.Physics.Arcade.Body
   private chairOnSit?: Chair
   public joystickMovement?: JoystickMovement
+
+  // 6.3 — Particules de poussiere subtiles quand le joueur bouge
+  private dustEmitter?: Phaser.GameObjects.Particles.ParticleEmitter
+  private dustManager?: Phaser.GameObjects.Particles.ParticleEmitterManager
+  private lastDustTime = 0
+
+  // 2E — Cercle de proximite / aura subtil
+  private proximityAura?: Phaser.GameObjects.Graphics
+  private auraBaseAlpha = 0.08
+  private auraPulsePhase = 0
+
   constructor(
     scene: Phaser.Scene,
     x: number,
@@ -31,7 +43,7 @@ export default class MyPlayer extends Player {
     this.playContainerBody = this.playerContainer.body as Phaser.Physics.Arcade.Body
   }
 
-  setPlayerName(name: string) {
+  setPlayerName(name: string): void {
     this.playerName.setText(name)
     this.updateNameBackground()
     this.updateStatusDot('available')
@@ -39,14 +51,57 @@ export default class MyPlayer extends Player {
     store.dispatch(pushPlayerJoinedMessage(name))
   }
 
-  setPlayerTexture(texture: string) {
+  setPlayerTexture(texture: string): void {
     this.playerTexture = texture
     this.anims.play(`${this.playerTexture}_idle_down`, true)
     phaserEvents.emit(Event.MY_PLAYER_TEXTURE_CHANGE, this.x, this.y, this.anims.currentAnim.key)
   }
 
-  handleJoystickMovement(movement: JoystickMovement) {
+  handleJoystickMovement(movement: JoystickMovement): void {
     this.joystickMovement = movement
+  }
+
+  /** Initialise le cercle d'aura de proximite */
+  private initProximityAura() {
+    if (this.proximityAura) return
+    this.proximityAura = this.scene.add.graphics()
+    this.proximityAura.setDepth(this.depth - 2)
+  }
+
+  /** Met a jour l'aura chaque frame — pulse quand un autre joueur est proche */
+  updateProximityAura(hasNearbyPlayer: boolean): void {
+    this.initProximityAura()
+    if (!this.proximityAura) return
+
+    this.proximityAura.clear()
+    this.proximityAura.setPosition(this.x, this.y)
+
+    // Pulse brievement quand un joueur est proche
+    if (hasNearbyPlayer) {
+      this.auraPulsePhase += 0.12
+      const pulse = 0.04 * Math.sin(this.auraPulsePhase)
+      const alpha = this.auraBaseAlpha + pulse + 0.04
+      this.proximityAura.fillStyle(0x14b8a6, alpha)
+      this.proximityAura.fillCircle(0, 0, 48)
+    } else {
+      this.auraPulsePhase = 0
+      this.proximityAura.fillStyle(0x14b8a6, this.auraBaseAlpha)
+      this.proximityAura.fillCircle(0, 0, 48)
+    }
+  }
+
+  private initDustEmitter() {
+    if (this.dustEmitter || !this.scene.textures.exists('particle_white')) return
+    this.dustManager = this.scene.add.particles('particle_white')
+    this.dustManager.setDepth(1)
+    this.dustEmitter = this.dustManager.createEmitter({
+      speed: { min: 5, max: 15 },
+      alpha: { start: 0.2, end: 0 },
+      scale: { start: 0.3, end: 0.1 },
+      lifespan: 300,
+      on: false,
+      tint: 0xccccaa,
+    })
   }
 
   update(
@@ -55,7 +110,7 @@ export default class MyPlayer extends Player {
     keyE: Phaser.Input.Keyboard.Key,
     keyR: Phaser.Input.Keyboard.Key,
     network: Network
-  ) {
+  ): void {
     if (!cursors) return
 
     const item = playerSelector.selectedItem
@@ -128,6 +183,23 @@ export default class MyPlayer extends Player {
           return
         }
 
+        // Appuyer sur E devant une porte → teleportation de l'autre cote
+        if (Phaser.Input.Keyboard.JustDown(keyE) && item?.itemType === ItemType.DOOR) {
+          const door = item as Door
+          const target = door.getTeleportTarget(this.x, this.y)
+
+          this.setVelocity(0, 0)
+          this.setPosition(target.x, target.y)
+          this.playContainerBody.setVelocity(0, 0)
+          this.playerContainer.setPosition(target.x, target.y - 30)
+
+          door.clearDialogBox()
+          playerSelector.selectedItem = undefined
+
+          network.updatePlayer(this.x, this.y, this.anims.currentAnim.key)
+          return
+        }
+
         const speed = 250
         let vx = 0
         let vy = 0
@@ -160,6 +232,16 @@ export default class MyPlayer extends Player {
         // also update playerNameContainer velocity
         this.playContainerBody.setVelocity(vx, vy)
         this.playContainerBody.velocity.setLength(speed)
+
+        // 6.3 — Particules de poussiere subtiles quand le joueur bouge
+        if (vx !== 0 || vy !== 0) {
+          const now = this.scene.time.now
+          if (now - this.lastDustTime > 80) {
+            this.lastDustTime = now
+            this.initDustEmitter()
+            this.dustEmitter?.emitParticleAt?.(this.x, this.y + 12, 1)
+          }
+        }
 
         // update animation according to velocity and send new location and anim to server
         if (vx !== 0 || vy !== 0) network.updatePlayer(this.x, this.y, this.anims.currentAnim.key)

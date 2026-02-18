@@ -31,10 +31,31 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   private currentStatus = ''
   private isInMyMeeting = false
 
+  // 3A — Cercle avatar colore (premiere lettre du nom)
+  private avatarCircle: Phaser.GameObjects.Graphics
+  private avatarLetter: Phaser.GameObjects.Text
+
+  // 3A — Indicateur de typing ("..." anime)
+  private typingIndicator: Phaser.GameObjects.Text
+  private isTyping = false
+  private typingDotPhase = 0
+
+  // 3C — AFK / idle
+  private afkText: Phaser.GameObjects.Text
+  private isAfk = false
+  private afkBobPhase = 0
+
   // Indicateur de parole (cercle pulsant autour du sprite)
   private speakingIndicator: Phaser.GameObjects.Graphics
   private isSpeakingNow = false
   private speakingPulsePhase = 0
+
+  // 5D — Animations idle variees
+  private idleTimer = 0
+  private idleBobTween?: Phaser.Tweens.Tween
+
+  // 6.2 — Ombre dynamique sous le joueur
+  private playerShadow: Phaser.GameObjects.Graphics
 
   constructor(
     scene: Phaser.Scene,
@@ -62,6 +83,19 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.playerNameBg = this.scene.add.graphics()
     this.playerContainer.add(this.playerNameBg)
 
+    // 3A — Cercle avatar colore (premiere lettre du nom) a gauche du nom
+    this.avatarCircle = this.scene.add.graphics()
+    this.playerContainer.add(this.avatarCircle)
+
+    this.avatarLetter = this.scene.add
+      .text(0, 0, '')
+      .setFontFamily('Arial')
+      .setFontSize(9)
+      .setFontStyle('bold')
+      .setColor('#ffffff')
+      .setOrigin(0.5)
+    this.playerContainer.add(this.avatarLetter)
+
     // add playerName to playerContainer
     this.playerName = this.scene.add
       .text(0, 0, '')
@@ -84,6 +118,21 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.playerStatusDot = this.scene.add.graphics()
     this.playerContainer.add(this.playerStatusDot)
 
+    // 3A — Indicateur de typing ("..." anime) sous le nom
+    this.typingIndicator = this.scene.add
+      .text(0, 14, '', { fontSize: '10px', fontFamily: 'Arial' })
+      .setColor('#14b8a6')
+      .setOrigin(0.5)
+      .setVisible(false)
+    this.playerContainer.add(this.typingIndicator)
+
+    // 3C — Texte "zzz" AFK au-dessus de la tete
+    this.afkText = this.scene.add
+      .text(0, -22, '💤', { fontSize: '12px' })
+      .setOrigin(0.5)
+      .setVisible(false)
+    this.playerContainer.add(this.afkText)
+
     // Icone camera au-dessus du nom (visible si le joueur est dans la meme reunion)
     this.playerMeetingIcon = this.scene.add
       .text(0, -18, '📷')
@@ -96,6 +145,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.speakingIndicator = this.scene.add.graphics()
     this.speakingIndicator.setVisible(false)
 
+    // 6.2 — Ombre dynamique (ellipse noire sous le sprite)
+    this.playerShadow = this.scene.add.graphics()
+    this.playerShadow.fillStyle(0x000000, 0.3)
+    this.playerShadow.fillEllipse(0, 0, 16, 6)
+    this.playerShadow.setDepth(this.y - 1)
+
     this.scene.physics.world.enable(this.playerContainer)
     const playContainerBody = this.playerContainer.body as Phaser.Physics.Arcade.Body
     const collisionScale = [0.5, 0.2]
@@ -104,19 +159,48 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       .setOffset(-8, this.height * (1 - collisionScale[1]) + 6)
   }
 
-  setPlayerRole(role: string) {
+  // 6.2 — Mise a jour de l'ombre dynamique chaque frame
+  preUpdate(t: number, dt: number): void {
+    super.preUpdate(t, dt)
+    if (this.playerShadow) {
+      this.playerShadow.setPosition(this.x, this.y + 12)
+      this.playerShadow.setDepth(this.depth - 1)
+    }
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.playerShadow?.destroy()
+    super.destroy(fromScene)
+  }
+
+  setPlayerRole(role: string): void {
     this.playerRoleText.setText(role)
   }
 
-  /** Met a jour le fond semi-transparent derriere le nom du joueur */
-  protected updateNameBackground() {
+  /** Met a jour le fond semi-transparent derriere le nom du joueur + cercle avatar */
+  protected updateNameBackground(): void {
     this.playerNameBg.clear()
+    this.avatarCircle.clear()
     if (!this.playerName.text) return
+
+    // 3A — Cercle avatar avec premiere lettre du nom
+    const avatarRadius = 7
+    const avatarOffset = -this.playerName.width / 2 - avatarRadius - 6
+    const avatarColor = this.getNameColor(this.playerName.text)
+    this.avatarCircle.fillStyle(avatarColor, 1)
+    this.avatarCircle.fillCircle(avatarOffset, 0, avatarRadius)
+    this.avatarLetter.setText(this.playerName.text.charAt(0).toUpperCase())
+    this.avatarLetter.setPosition(avatarOffset, 0)
+
+    // Fond semi-transparent elargi pour inclure le cercle avatar
     const padding = 6
-    const w = this.playerName.width + padding * 2
+    const extraLeft = avatarRadius * 2 + 4
+    const w = this.playerName.width + padding * 2 + extraLeft
     const h = this.playerName.height + 4
+    const bgX = -this.playerName.width / 2 - padding - extraLeft
     this.playerNameBg.fillStyle(0x000000, 0.5)
-    this.playerNameBg.fillRoundedRect(-w / 2, -h / 2, w, h, 4)
+    this.playerNameBg.fillRoundedRect(bgX, -h / 2, w, h, 4)
+
     // Repositionner le dot de statut (la largeur du nom a pu changer)
     if (this.currentStatus) {
       const saved = this.currentStatus
@@ -125,7 +209,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  updateDialogBubble(content: string) {
+  /** Retourne une couleur deterministe basee sur le nom du joueur */
+  private getNameColor(name: string): number {
+    const colors = [0x7bf1a8, 0xff7e50, 0x9acd32, 0xdaa520, 0xff69b4, 0xc085f6, 0x1e90ff, 0x5f9da0]
+    return colors[Math.floor(name.charCodeAt(0) % colors.length)]
+  }
+
+  updateDialogBubble(content: string): void {
     this.clearDialogBubble()
 
     // preprocessing for dialog bubble text (maximum 70 characters)
@@ -170,7 +260,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Met a jour le point de statut colore a gauche du nom */
-  updateStatusDot(status: string) {
+  updateStatusDot(status: string): void {
     if (this.currentStatus === status) return
     this.currentStatus = status
 
@@ -187,14 +277,31 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Affiche ou cache l'icone camera (collegue dans la meme reunion) */
-  updateMeetingIcon(visible: boolean) {
+  updateMeetingIcon(visible: boolean): void {
     if (this.isInMyMeeting === visible) return
     this.isInMyMeeting = visible
     this.playerMeetingIcon.setVisible(visible)
   }
 
+  /** Affiche un emoji qui monte et fade au-dessus du joueur */
+  showEmoji(emoji: string): void {
+    const emojiText = this.scene.add
+      .text(this.x, this.y - 40, emoji, { fontSize: '24px' })
+      .setOrigin(0.5)
+      .setDepth(6000)
+
+    this.scene.tweens.add({
+      targets: emojiText,
+      y: this.y - 80,
+      alpha: { from: 1, to: 0 },
+      duration: 2000,
+      ease: 'Power2',
+      onComplete: () => emojiText.destroy(),
+    })
+  }
+
   /** Met a jour l'indicateur de parole (cercle pulsant vert autour du sprite) */
-  updateSpeakingIndicator(speaking: boolean) {
+  updateSpeakingIndicator(speaking: boolean): void {
     if (this.isSpeakingNow === speaking) return
     this.isSpeakingNow = speaking
     this.speakingIndicator.setVisible(speaking)
@@ -205,7 +312,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Appelée a chaque frame pour animer le cercle pulsant */
-  updateSpeakingPulse() {
+  updateSpeakingPulse(): void {
     if (!this.isSpeakingNow) return
 
     this.speakingPulsePhase += 0.08
@@ -216,5 +323,87 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.speakingIndicator.lineStyle(2, 0x14b8a6, alpha)
     this.speakingIndicator.strokeCircle(this.x, this.y - 4, radius)
     this.speakingIndicator.setDepth(this.depth - 1)
+  }
+
+  // ─── 3A — Typing indicator ──────────────────────────────────────────────
+
+  /** Met a jour la visibilite de l'indicateur de typing */
+  updateTypingIndicator(typing: boolean): void {
+    if (this.isTyping === typing) return
+    this.isTyping = typing
+    this.typingIndicator.setVisible(typing)
+    if (!typing) {
+      this.typingDotPhase = 0
+      this.typingIndicator.setText('')
+    }
+  }
+
+  /** Anime les "..." du typing indicator (appeler chaque frame) */
+  updateTypingAnimation(): void {
+    if (!this.isTyping) return
+    this.typingDotPhase += 0.05
+    const dotCount = (Math.floor(this.typingDotPhase) % 3) + 1
+    this.typingIndicator.setText('.'.repeat(dotCount))
+  }
+
+  // ─── 3C — AFK / idle status ─────────────────────────────────────────────
+
+  /** Met a jour l'indicateur AFK (zzz au-dessus de la tete) */
+  updateAfkStatus(afk: boolean): void {
+    if (this.isAfk === afk) return
+    this.isAfk = afk
+    this.afkText.setVisible(afk)
+    if (afk) {
+      // Demarrer l'animation de bob du zzz
+      this.scene.tweens.add({
+        targets: this.afkText,
+        y: { from: -22, to: -28 },
+        alpha: { from: 1, to: 0.5 },
+        duration: 1500,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: -1,
+      })
+    } else {
+      this.scene.tweens.killTweensOf(this.afkText)
+      this.afkText.setY(-22).setAlpha(1)
+    }
+  }
+
+  /** Anime un subtil balancement du corps quand AFK (appeler chaque frame) */
+  updateAfkAnimation(): void {
+    if (!this.isAfk) return
+    this.afkBobPhase += 0.02
+    // Subtle scale oscillation
+    const scaleX = 1 + 0.015 * Math.sin(this.afkBobPhase)
+    this.setScale(scaleX, 1)
+  }
+
+  // ─── 5D — Animations idle variees ────────────────────────────────────────
+
+  /** Gere le timer d'idle et lance l'animation bob apres 5s immobile */
+  updateIdleAnimation(dt: number, isMoving: boolean): void {
+    if (isMoving || this.isAfk) {
+      this.idleTimer = 0
+      if (this.idleBobTween) {
+        this.idleBobTween.stop()
+        this.idleBobTween = undefined
+        this.setScale(1, 1)
+      }
+      return
+    }
+
+    this.idleTimer += dt
+    if (this.idleTimer > 5000 && !this.idleBobTween) {
+      // Subtil bob vertical
+      this.idleBobTween = this.scene.tweens.add({
+        targets: this,
+        y: this.y - 1.5,
+        duration: 1200,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: -1,
+      })
+    }
   }
 }

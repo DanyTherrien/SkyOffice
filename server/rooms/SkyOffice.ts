@@ -16,14 +16,37 @@ import {
   WhiteboardRemoveUserCommand,
 } from './commands/WhiteboardUpdateArrayCommand'
 import ChatMessageUpdateCommand from './commands/ChatMessageUpdateCommand'
+import { AiBotService } from '../services/AiBotService'
 
 export class SkyOffice extends Room<OfficeState> {
   private dispatcher = new Dispatcher(this)
   private name: string
   private description: string
   private password: string | null = null
+  private aiBotService = new AiBotService()
 
-  async onCreate(options: IRoomData) {
+  // Etat transient des outils de reunion (non persiste dans le schema Colyseus)
+  private meetingToolsState = {
+    timerRunning: false,
+    timerStartTime: null as number | null,
+    timerDuration: null as number | null,
+    agenda: '',
+    notes: '',
+  }
+
+  // Etat transient des sticky notes du brainstorm (non persiste dans le schema)
+  private brainstormNotes: Map<string, {
+    id: string
+    text: string
+    color: string
+    authorName: string
+    authorId: string
+    votes: Set<string>
+    timestamp: number
+  }> = new Map()
+  private brainstormNoteCounter = 0
+
+  async onCreate(options: IRoomData): Promise<void> {
     const { name, description, password, autoDispose } = options
     this.name = name
     this.description = description
@@ -142,11 +165,49 @@ export class SkyOffice extends Room<OfficeState> {
     this.onMessage(Message.UPDATE_PLAYER_ZONE, (client, message: { zone: string }) => {
       const player = this.state.players.get(client.sessionId)
       if (!player) return
+
+      // Verifier la capacite pour la zone one_on_one (max 2 joueurs)
+      if (message.zone === 'one_on_one' && player.zone !== 'one_on_one') {
+        const count = this.getZonePlayerCount('one_on_one')
+        if (count >= 2) {
+          client.send(Message.ZONE_FULL, { zone: 'one_on_one', maxCapacity: 2 })
+          return
+        }
+      }
+
       const oldZone = player.zone
       player.zone = message.zone
+      // Si le joueur quitte la zone AFK, effacer sa raison AFK
+      if (message.zone !== 'afk') {
+        player.afkReason = ''
+      }
+      // Si le joueur quitte la zone Sales, effacer son statut de vente
+      if (message.zone !== 'sales') {
+        player.salesStatus = ''
+      }
+      // Si le joueur quitte la zone Sales alors qu'il observe quelqu'un, arreter l'observation
+      if (oldZone === 'sales' && message.zone !== 'sales' && player.observingTarget) {
+        const targetId = player.observingTarget
+        player.observingTarget = ''
+        this.clients.forEach((cli) => {
+          if (cli.sessionId === targetId) {
+            cli.send(Message.OBSERVER_REMOVED, { observerId: client.sessionId })
+          }
+        })
+      }
       // Broadcaster la liste des membres mise a jour pour les deux zones
       this.broadcastZoneMembers(oldZone)
       this.broadcastZoneMembers(message.zone)
+
+      // Si le joueur entre dans la zone meeting, synchroniser les outils de reunion
+      if (message.zone === 'meeting' && oldZone !== 'meeting') {
+        this.syncMeetingToolsToClient(client)
+      }
+
+      // Si le joueur entre dans la zone brainstorm, synchroniser les sticky notes existantes
+      if (message.zone === 'brainstorm' && oldZone !== 'brainstorm') {
+        this.syncBrainstormNotesToClient(client)
+      }
     })
 
     // quand un joueur met a jour son role
@@ -159,6 +220,19 @@ export class SkyOffice extends Room<OfficeState> {
     this.onMessage(Message.UPDATE_PLAYER_STATUS, (client, message: { status: string }) => {
       const player = this.state.players.get(client.sessionId)
       if (player) player.status = message.status
+    })
+
+    // quand un joueur met a jour son statut de vente (on_call, available, preparing)
+    this.onMessage(Message.UPDATE_SALES_STATUS, (client, message: { salesStatus: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (player) player.salesStatus = message.salesStatus
+    })
+
+    // quand un joueur met a jour sa raison AFK (coffee, lunch, errand, etc.)
+    this.onMessage(Message.UPDATE_PLAYER_AFK_REASON, (client, message: { reason: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      player.afkReason = message.reason
     })
 
     // quand un joueur envoie un message de chat zone
@@ -186,6 +260,23 @@ export class SkyOffice extends Room<OfficeState> {
           })
         }
       })
+
+      // Declencher le bot IA si le joueur est dans la zone brainstorm et mentionne @crea
+      if (zone === 'brainstorm' && /^@crea\b/i.test(message.content.trim())) {
+        const prompt = message.content.trim().replace(/^@crea\s*/i, '')
+        if (prompt) {
+          this.handleAiBotRequest(player.name, prompt)
+        }
+      }
+    })
+
+    // Requete explicite au bot IA (depuis le panneau BrainstormBot)
+    this.onMessage(Message.AI_BOT_REQUEST, (client, message: { prompt: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+      if (message.prompt) {
+        this.handleAiBotRequest(player.name, message.prompt)
+      }
     })
 
     // quand un joueur arrete le screen share de zone
@@ -200,6 +291,353 @@ export class SkyOffice extends Room<OfficeState> {
           cli.send(Message.ZONE_SCREEN_SHARE_STOPPED, client.sessionId)
         }
       })
+    })
+
+    // quand un joueur envoie une reaction emoji, broadcaster a tous les autres
+    this.onMessage(Message.EMOJI_REACTION, (client, message: { emoji: string }) => {
+      this.broadcast(
+        Message.EMOJI_REACTION,
+        { playerId: client.sessionId, emoji: message.emoji },
+        { except: client }
+      )
+    })
+
+    // quand un joueur commence/arrete de taper, broadcaster a tous les autres
+    this.onMessage(Message.TYPING_STATUS, (client, message: { typing: boolean }) => {
+      this.broadcast(
+        Message.TYPING_STATUS,
+        { playerId: client.sessionId, typing: message.typing },
+        { except: client }
+      )
+    })
+
+    // quand un joueur passe en AFK ou revient, broadcaster a tous les autres
+    this.onMessage(Message.AFK_STATUS, (client, message: { afk: boolean }) => {
+      this.broadcast(
+        Message.AFK_STATUS,
+        { playerId: client.sessionId, afk: message.afk },
+        { except: client }
+      )
+    })
+
+    // Quand un joueur frappe a la porte de la salle Sales (Knock)
+    this.onMessage(
+      Message.KNOCK_REQUEST,
+      (client, message: { targetId: string; message?: string }) => {
+        const knocker = this.state.players.get(client.sessionId)
+        if (!knocker) return
+        const target = this.state.players.get(message.targetId)
+        if (!target || target.zone !== 'sales') return
+
+        // Trouver le client cible et lui envoyer la notification de knock
+        this.clients.forEach((cli) => {
+          if (cli.sessionId === message.targetId) {
+            cli.send(Message.KNOCK_RECEIVED, {
+              knockerId: client.sessionId,
+              knockerName: knocker.name,
+              message: message.message,
+            })
+          }
+        })
+      }
+    )
+
+    // Quand un rep Sales repond a un knock
+    this.onMessage(
+      Message.KNOCK_RESPONSE,
+      (client, message: { knockerId: string; response: 'accept' | 'refuse' | 'later' }) => {
+        const responder = this.state.players.get(client.sessionId)
+        if (!responder) return
+
+        // Trouver le client qui a frappe et lui envoyer le resultat
+        this.clients.forEach((cli) => {
+          if (cli.sessionId === message.knockerId) {
+            cli.send(Message.KNOCK_RESULT, {
+              targetId: client.sessionId,
+              targetName: responder.name,
+              response: message.response,
+            })
+          }
+        })
+      }
+    )
+
+    // Quand un manager commence a observer un rep Sales (shadow mode)
+    this.onMessage(Message.START_OBSERVING, (client, message: { targetId: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const target = this.state.players.get(message.targetId)
+      if (!target || target.zone !== 'sales') return
+
+      // Arreter une observation precedente si existante
+      if (player.observingTarget) {
+        this.clients.forEach((cli) => {
+          if (cli.sessionId === player.observingTarget) {
+            cli.send(Message.OBSERVER_REMOVED, { observerId: client.sessionId })
+          }
+        })
+      }
+
+      player.observingTarget = message.targetId
+
+      // Notifier la cible qu'elle est observee
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === message.targetId) {
+          cli.send(Message.OBSERVER_ADDED, {
+            observerId: client.sessionId,
+            observerName: player.name,
+          })
+        }
+      })
+    })
+
+    // Quand un manager arrete d'observer
+    this.onMessage(Message.STOP_OBSERVING, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || !player.observingTarget) return
+
+      const targetId = player.observingTarget
+      player.observingTarget = ''
+
+      // Notifier la cible que l'observation est terminee
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === targetId) {
+          cli.send(Message.OBSERVER_REMOVED, { observerId: client.sessionId })
+        }
+      })
+    })
+
+    // Quand un joueur invite quelqu'un au booth 1-on-1
+    this.onMessage(Message.INVITE_TO_BOOTH, (client, message: { targetId: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+
+      // Verifier que la zone one_on_one a de la place (max 2)
+      const count = this.getZonePlayerCount('one_on_one')
+      if (count >= 2) {
+        client.send(Message.ZONE_FULL, { zone: 'one_on_one', maxCapacity: 2 })
+        return
+      }
+
+      // Envoyer l'invitation a la cible
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === message.targetId) {
+          cli.send(Message.BOOTH_INVITE_RECEIVED, {
+            inviterId: client.sessionId,
+            inviterName: player.name,
+          })
+        }
+      })
+    })
+
+    // Quand un joueur repond a une invitation 1-on-1
+    this.onMessage(
+      Message.BOOTH_INVITE_RESPONSE,
+      (client, message: { inviterId: string; accepted: boolean }) => {
+        const player = this.state.players.get(client.sessionId)
+        if (!player) return
+
+        // Envoyer le resultat a l'inviteur
+        this.clients.forEach((cli) => {
+          if (cli.sessionId === message.inviterId) {
+            cli.send(Message.BOOTH_INVITE_RESULT, {
+              targetId: client.sessionId,
+              targetName: player.name,
+              accepted: message.accepted,
+            })
+          }
+        })
+      }
+    )
+
+    // Quand un joueur demarre l'enregistrement audio, notifier tous les membres de la zone
+    this.onMessage(Message.START_RECORDING, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const zone = player.zone
+      const recorderName = player.name
+      // Broadcaster a tous les joueurs de la meme zone (y compris l'enregistreur)
+      this.clients.forEach((cli) => {
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === zone) {
+          cli.send(Message.RECORDING_STARTED, { recorderName })
+        }
+      })
+    })
+
+    // Quand un joueur arrete l'enregistrement audio, notifier tous les membres de la zone
+    this.onMessage(Message.STOP_RECORDING, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player) return
+      const zone = player.zone
+      const recorderName = player.name
+      // Broadcaster a tous les joueurs de la meme zone
+      this.clients.forEach((cli) => {
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === zone) {
+          cli.send(Message.RECORDING_STOPPED, { recorderName })
+        }
+      })
+    })
+
+    // ─── Outils de reunion structuree (Meeting Room) ────────────────────────────
+
+    // Quand un participant demarre le minuteur
+    this.onMessage(Message.MEETING_TIMER_START, (client, message: { duration?: number }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'meeting') return
+
+      this.meetingToolsState.timerRunning = true
+      this.meetingToolsState.timerStartTime = Date.now()
+      this.meetingToolsState.timerDuration = message.duration ?? null
+
+      // Broadcaster a tous les joueurs dans la zone meeting
+      this.broadcastToMeetingZone(Message.MEETING_TIMER_SYNC, {
+        running: true,
+        startTime: this.meetingToolsState.timerStartTime,
+        duration: this.meetingToolsState.timerDuration,
+      })
+    })
+
+    // Quand un participant arrete le minuteur
+    this.onMessage(Message.MEETING_TIMER_STOP, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'meeting') return
+
+      this.meetingToolsState.timerRunning = false
+
+      // Broadcaster a tous les joueurs dans la zone meeting
+      this.broadcastToMeetingZone(Message.MEETING_TIMER_SYNC, {
+        running: false,
+        startTime: this.meetingToolsState.timerStartTime,
+        duration: this.meetingToolsState.timerDuration,
+      })
+    })
+
+    // Quand un participant met a jour l'ordre du jour
+    this.onMessage(Message.MEETING_AGENDA_UPDATE, (client, message: { agenda: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'meeting') return
+
+      this.meetingToolsState.agenda = message.agenda
+
+      // Broadcaster aux autres joueurs dans la zone meeting (sauf l'emetteur)
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === client.sessionId) return
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === 'meeting') {
+          cli.send(Message.MEETING_AGENDA_UPDATE, { agenda: message.agenda })
+        }
+      })
+    })
+
+    // Quand un participant met a jour les notes collaboratives
+    this.onMessage(Message.MEETING_NOTES_UPDATE, (client, message: { notes: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'meeting') return
+
+      this.meetingToolsState.notes = message.notes
+
+      // Broadcaster aux autres joueurs dans la zone meeting (sauf l'emetteur)
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === client.sessionId) return
+        const cliPlayer = this.state.players.get(cli.sessionId)
+        if (cliPlayer?.zone === 'meeting') {
+          cli.send(Message.MEETING_NOTES_UPDATE, { notes: message.notes })
+        }
+      })
+    })
+
+    // ─── Outils de brainstorm — sticky notes + votes ──────────────────────────
+
+    // Quand un joueur ajoute une sticky note
+    this.onMessage(Message.ADD_STICKY_NOTE, (client, message: { text: string; color: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+
+      const noteId = `note_${++this.brainstormNoteCounter}_${Date.now()}`
+      const note = {
+        id: noteId,
+        text: message.text,
+        color: message.color,
+        authorName: player.name,
+        authorId: client.sessionId,
+        votes: new Set<string>(),
+        timestamp: Date.now(),
+      }
+      this.brainstormNotes.set(noteId, note)
+
+      // Broadcaster a tous les joueurs dans la zone brainstorm
+      this.broadcastToBrainstormZone(Message.STICKY_NOTE_ADDED, {
+        noteId,
+        text: note.text,
+        color: note.color,
+        authorName: note.authorName,
+        authorId: note.authorId,
+        timestamp: note.timestamp,
+      })
+    })
+
+    // Quand un joueur supprime une note (seul l'auteur peut supprimer)
+    this.onMessage(Message.REMOVE_STICKY_NOTE, (client, message: { noteId: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+
+      const note = this.brainstormNotes.get(message.noteId)
+      if (!note || note.authorId !== client.sessionId) return
+
+      this.brainstormNotes.delete(message.noteId)
+
+      this.broadcastToBrainstormZone(Message.STICKY_NOTE_REMOVED, {
+        noteId: message.noteId,
+      })
+    })
+
+    // Quand un joueur vote pour une note (toggle)
+    this.onMessage(Message.VOTE_NOTE, (client, message: { noteId: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+
+      const note = this.brainstormNotes.get(message.noteId)
+      if (!note) return
+
+      if (note.votes.has(client.sessionId)) {
+        note.votes.delete(client.sessionId)
+      } else {
+        note.votes.add(client.sessionId)
+      }
+
+      this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
+        noteId: message.noteId,
+        votes: note.votes.size,
+        voters: Array.from(note.votes),
+      })
+    })
+
+    // Quand un joueur retire son vote
+    this.onMessage(Message.UNVOTE_NOTE, (client, message: { noteId: string }) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+
+      const note = this.brainstormNotes.get(message.noteId)
+      if (!note) return
+
+      note.votes.delete(client.sessionId)
+
+      this.broadcastToBrainstormZone(Message.VOTE_UPDATED, {
+        noteId: message.noteId,
+        votes: note.votes.size,
+        voters: Array.from(note.votes),
+      })
+    })
+
+    // Quand un joueur efface tout le tableau de brainstorm
+    this.onMessage(Message.CLEAR_BOARD, (client) => {
+      const player = this.state.players.get(client.sessionId)
+      if (!player || player.zone !== 'brainstorm') return
+
+      this.brainstormNotes.clear()
+      this.broadcastToBrainstormZone(Message.BOARD_CLEARED, {})
     })
 
     // when a player send a chat message, update the message array and broadcast to all connected clients except the sender
@@ -233,7 +671,91 @@ export class SkyOffice extends Room<OfficeState> {
     })
   }
 
-  async onAuth(client: Client, options: { password: string | null }) {
+  // Broadcaster un message a tous les clients dans la zone 'meeting'
+  private broadcastToMeetingZone(messageType: Message, data: any) {
+    this.clients.forEach((cli) => {
+      const p = this.state.players.get(cli.sessionId)
+      if (p?.zone === 'meeting') {
+        cli.send(messageType, data)
+      }
+    })
+  }
+
+  // Envoyer l'etat actuel des outils de reunion a un client qui rejoint la zone meeting
+  private syncMeetingToolsToClient(client: Client) {
+    // Synchroniser le minuteur
+    client.send(Message.MEETING_TIMER_SYNC, {
+      running: this.meetingToolsState.timerRunning,
+      startTime: this.meetingToolsState.timerStartTime,
+      duration: this.meetingToolsState.timerDuration,
+    })
+    // Synchroniser l'ordre du jour
+    if (this.meetingToolsState.agenda) {
+      client.send(Message.MEETING_AGENDA_UPDATE, {
+        agenda: this.meetingToolsState.agenda,
+      })
+    }
+    // Synchroniser les notes
+    if (this.meetingToolsState.notes) {
+      client.send(Message.MEETING_NOTES_UPDATE, {
+        notes: this.meetingToolsState.notes,
+      })
+    }
+  }
+
+  // Envoyer toutes les sticky notes existantes a un client qui rejoint la zone brainstorm
+  private syncBrainstormNotesToClient(client: Client) {
+    if (this.brainstormNotes.size === 0) return
+    const notes = Array.from(this.brainstormNotes.values()).map((note) => ({
+      noteId: note.id,
+      text: note.text,
+      color: note.color,
+      authorName: note.authorName,
+      authorId: note.authorId,
+      votes: note.votes.size,
+      voters: Array.from(note.votes),
+      timestamp: note.timestamp,
+    }))
+    client.send(Message.SYNC_BOARD, { notes })
+  }
+
+  // Envoyer un message a tous les clients dans la zone 'brainstorm'
+  private broadcastToBrainstormZone(messageType: Message, data: any) {
+    this.clients.forEach((cli) => {
+      const p = this.state.players.get(cli.sessionId)
+      if (p?.zone === 'brainstorm') {
+        cli.send(messageType, data)
+      }
+    })
+  }
+
+  // Gerer une requete au bot IA: envoyer l'indicateur de reflexion, generer la reponse, et la broadcaster
+  private async handleAiBotRequest(userName: string, prompt: string) {
+    // Envoyer l'indicateur de reflexion a tous les membres de la zone brainstorm
+    this.broadcastToBrainstormZone(Message.AI_BOT_THINKING, { zone: 'brainstorm' })
+
+    try {
+      const botResponse = await this.aiBotService.generateResponse(prompt, userName)
+      // Envoyer la reponse du bot a tous les membres de la zone brainstorm
+      this.broadcastToBrainstormZone(Message.AI_BOT_MESSAGE, {
+        content: botResponse,
+        zone: 'brainstorm',
+      })
+    } catch (error) {
+      console.error('AI Bot handler error:', error)
+    }
+  }
+
+  // Compter le nombre de joueurs dans une zone donnee
+  private getZonePlayerCount(zone: string): number {
+    let count = 0
+    this.state.players.forEach((player) => {
+      if (player.zone === zone) count++
+    })
+    return count
+  }
+
+  async onAuth(_client: Client, options: { password: string | null }): Promise<boolean> {
     if (this.password) {
       const validPassword = await bcrypt.compare(options.password, this.password)
       if (!validPassword) {
@@ -243,7 +765,7 @@ export class SkyOffice extends Room<OfficeState> {
     return true
   }
 
-  onJoin(client: Client, options: any) {
+  onJoin(client: Client): void {
     this.state.players.set(client.sessionId, new Player())
     client.send(Message.SEND_ROOM_DATA, {
       id: this.roomId,
@@ -258,10 +780,20 @@ export class SkyOffice extends Room<OfficeState> {
     }
   }
 
-  onLeave(client: Client, consented: boolean) {
+  onLeave(client: Client): void {
     // Sauvegarder la zone avant de supprimer le joueur pour broadcaster la mise a jour
     const player = this.state.players.get(client.sessionId)
     const playerZone = player?.zone
+
+    // Si le joueur observait quelqu'un, notifier la cible
+    if (player?.observingTarget) {
+      const targetId = player.observingTarget
+      this.clients.forEach((cli) => {
+        if (cli.sessionId === targetId) {
+          cli.send(Message.OBSERVER_REMOVED, { observerId: client.sessionId })
+        }
+      })
+    }
 
     if (this.state.players.has(client.sessionId)) {
       this.state.players.delete(client.sessionId)
@@ -283,7 +815,7 @@ export class SkyOffice extends Room<OfficeState> {
     }
   }
 
-  onDispose() {
+  onDispose(): void {
     this.state.whiteboards.forEach((whiteboard) => {
       if (whiteboardRoomIds.has(whiteboard.roomId)) whiteboardRoomIds.delete(whiteboard.roomId)
     })

@@ -10,7 +10,7 @@ type Payload = {
 }
 
 export default class PlayerUpdateCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, x, y, anim } = data
 
     const player = this.room.state.players.get(client.sessionId)

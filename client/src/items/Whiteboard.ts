@@ -25,7 +25,7 @@ export default class Whiteboard extends Item {
     }
   }
 
-  onOverlapDialog() {
+  onOverlapDialog(): void {
     if (this.currentUsers.size === 0) {
       this.setDialogBox('Appuie sur R pour utiliser le tableau')
     } else {
@@ -33,19 +33,19 @@ export default class Whiteboard extends Item {
     }
   }
 
-  addCurrentUser(userId: string) {
+  addCurrentUser(userId: string): void {
     if (!this.currentUsers || this.currentUsers.has(userId)) return
     this.currentUsers.add(userId)
     this.updateStatus()
   }
 
-  removeCurrentUser(userId: string) {
+  removeCurrentUser(userId: string): void {
     if (!this.currentUsers || !this.currentUsers.has(userId)) return
     this.currentUsers.delete(userId)
     this.updateStatus()
   }
 
-  openDialog(network: Network) {
+  openDialog(network: Network): void {
     if (!this.id) return
     store.dispatch(openWhiteboardDialog(this.id))
     network.connectToWhiteboard(this.id)

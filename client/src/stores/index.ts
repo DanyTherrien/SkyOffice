@@ -8,6 +8,17 @@ import roomReducer from './RoomStore'
 import meetingReducer from './MeetingStore'
 import mediaSettingsReducer from './MediaSettingsStore'
 import notificationReducer from './NotificationStore'
+import toastReducer from './ToastStore'
+import deferredMessageReducer from './DeferredMessageStore'
+import knockReducer from './KnockStore'
+import observeReducer from './ObserveStore'
+import boothInviteReducer from './BoothInviteStore'
+import recordingReducer from './RecordingStore'
+import meetingToolsReducer from './MeetingToolsStore'
+import brainstormReducer from './BrainstormStore'
+import dashboardReducer from './DashboardStore'
+import analyticsReducer from './AnalyticsStore'
+import badgeReducer from './BadgeStore'
 
 enableMapSet()
 
@@ -21,6 +32,17 @@ const store = configureStore({
     meeting: meetingReducer,
     mediaSettings: mediaSettingsReducer,
     notification: notificationReducer,
+    toast: toastReducer,
+    deferredMessage: deferredMessageReducer,
+    knock: knockReducer,
+    observe: observeReducer,
+    boothInvite: boothInviteReducer,
+    recording: recordingReducer,
+    meetingTools: meetingToolsReducer,
+    brainstorm: brainstormReducer,
+    dashboard: dashboardReducer,
+    analytics: analyticsReducer,
+    badge: badgeReducer,
   },
   // Temporary disable serialize check for redux as we store MediaStream in ComputerStore.
   // https://stackoverflow.com/a/63244831

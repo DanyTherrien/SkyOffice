@@ -10,7 +10,7 @@ export default class Chair extends Item {
     this.itemType = ItemType.CHAIR
   }
 
-  onOverlapDialog() {
+  onOverlapDialog(): void {
     this.setDialogBox('Appuie sur E pour t\'asseoir')
   }
 }

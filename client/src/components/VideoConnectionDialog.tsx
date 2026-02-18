@@ -18,7 +18,7 @@ const Wrapper = styled.div`
   flex-direction: column;
 `
 
-export default function VideoConnectionDialog() {
+export default function VideoConnectionDialog(): JSX.Element {
   const [connectionWarning, setConnectionWarning] = useState(true)
   return (
     <Backdrop>

@@ -8,7 +8,7 @@ type Payload = {
 }
 
 export class ComputerAddUserCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, computerId } = data
     const computer = this.room.state.computers.get(computerId)
     const clientId = client.sessionId
@@ -19,7 +19,7 @@ export class ComputerAddUserCommand extends Command<IOfficeState, Payload> {
 }
 
 export class ComputerRemoveUserCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, computerId } = data
     const computer = this.state.computers.get(computerId)
 

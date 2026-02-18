@@ -16,99 +16,140 @@ import ArrowRightIcon from '@mui/icons-material/ArrowRight'
 import VideogameAssetIcon from '@mui/icons-material/VideogameAsset'
 import VideogameAssetOffIcon from '@mui/icons-material/VideogameAssetOff'
 import SettingsIcon from '@mui/icons-material/Settings'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import BarChartIcon from '@mui/icons-material/BarChart'
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 
 import { BackgroundMode } from '../../../types/BackgroundMode'
 import { setShowJoystick, toggleBackgroundMode } from '../stores/UserStore'
 import { openMediaSettings } from '../stores/MediaSettingsStore'
+import { toggleDashboard } from '../stores/DashboardStore'
+import { toggleAnalyticsPanel } from '../stores/AnalyticsStore'
+import { toggleBadgePanel } from '../stores/BadgeStore'
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { getAvatarString, getColorByString } from '../util'
 import UserListPanel from './UserListPanel'
+import { slideUp } from '../styles/animations'
 
-const Backdrop = styled.div`
+// ─── 4B — HelperButtonGroup transforme en toolbar dock ─────────────────────
+
+const DockBar = styled.div`
   position: fixed;
-  display: flex;
-  gap: 10px;
   bottom: 16px;
-  right: 16px;
-  align-items: flex-end;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #1a1e30ee;
+  border-radius: 20px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 20;
+  animation: ${slideUp} 0.3s ease-out;
+`
 
-  .wrapper-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+const Separator = styled.div`
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+`
+
+const DockButton = styled(Fab)`
+  && {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    background: transparent;
+    box-shadow: none;
+    color: #aaa;
+    transition: all 0.15s;
+
+    &:hover {
+      color: #14b8a6;
+      background: rgba(20, 184, 166, 0.1);
+    }
+
+    svg {
+      font-size: 20px;
+    }
   }
 `
 
-const Wrapper = styled.div`
-  position: relative;
-  font-size: 16px;
-  color: #eee;
-  background: #222639;
-  box-shadow: 0px 0px 5px #0000006f;
+const ActiveDockButton = styled(DockButton)`
+  && {
+    color: #14b8a6;
+    background: rgba(20, 184, 166, 0.15);
+    box-shadow: 0 0 8px rgba(20, 184, 166, 0.3);
+  }
+`
+
+const InfoPanel = styled.div`
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1e30ee;
   border-radius: 16px;
-  padding: 15px 35px 15px 15px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 16px 24px;
+  color: #eee;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 280px;
+  max-width: 460px;
+  animation: ${slideUp} 0.2s ease-out;
+  z-index: 19;
 
   .close {
     position: absolute;
-    top: 15px;
-    right: 15px;
+    top: 8px;
+    right: 8px;
   }
 
   .tip {
     margin-left: 12px;
+    font-size: 13px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  ul {
+    padding-left: 16px;
+    margin: 8px 0;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #ccc;
   }
 `
 
-const ButtonGroup = styled.div`
+const RoomInfoName = styled.div`
   display: flex;
   gap: 10px;
-`
-
-const Title = styled.h3`
-  font-size: 24px;
-  color: #eee;
-  text-align: center;
-`
-
-const RoomName = styled.div`
-  margin: 10px 20px;
-  max-width: 460px;
-  max-height: 150px;
-  overflow-wrap: anywhere;
-  overflow-y: auto;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
   align-items: center;
+  margin-bottom: 8px;
 
   h3 {
-    font-size: 24px;
-    color: #eee;
+    margin: 0;
+    font-size: 18px;
+    color: #fff;
   }
 `
 
-const RoomDescription = styled.div`
-  margin: 0 20px;
-  max-width: 460px;
-  max-height: 150px;
-  overflow-wrap: anywhere;
-  overflow-y: auto;
-  font-size: 16px;
-  color: #c2c2c2;
+const RoomInfoRow = styled.div`
+  font-size: 13px;
+  color: #999;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
 `
 
-const StyledFab = styled(Fab)<{ target?: string }>`
-  &:hover {
-    color: #1ea2df;
-  }
-`
-
-export default function HelperButtonGroup() {
+export default function HelperButtonGroup(): JSX.Element {
   const [showControlGuide, setShowControlGuide] = useState(false)
   const [showRoomInfo, setShowRoomInfo] = useState(false)
   const [showUserList, setShowUserList] = useState(false)
@@ -118,142 +159,202 @@ export default function HelperButtonGroup() {
   const roomId = useAppSelector((state) => state.room.roomId)
   const roomName = useAppSelector((state) => state.room.roomName)
   const roomDescription = useAppSelector((state) => state.room.roomDescription)
-  // +1 pour inclure le joueur local
   const playerCount = useAppSelector((state) => state.user.playerNameMap.size) + 1
+  const analyticsOpen = useAppSelector((state) => state.analytics.panelOpen)
+  const badgePanelOpen = useAppSelector((state) => state.badge.showBadgePanel)
+  const newBadgeId = useAppSelector((state) => state.badge.newBadgeId)
   const dispatch = useAppDispatch()
 
+  const closeAll = () => {
+    setShowControlGuide(false)
+    setShowRoomInfo(false)
+    setShowUserList(false)
+  }
+
+  const toggle = (panel: 'control' | 'room' | 'users') => {
+    setShowControlGuide(panel === 'control' ? !showControlGuide : false)
+    setShowRoomInfo(panel === 'room' ? !showRoomInfo : false)
+    setShowUserList(panel === 'users' ? !showUserList : false)
+  }
+
   return (
-    <Backdrop>
-      <div className="wrapper-group">
-        {roomJoined && (
-          <Tooltip title={showJoystick ? 'Désactiver le joystick virtuel' : 'Activer le joystick virtuel'}>
-            <StyledFab size="small" onClick={() => dispatch(setShowJoystick(!showJoystick))}>
-              {showJoystick ? <VideogameAssetOffIcon /> : <VideogameAssetIcon />}
-            </StyledFab>
-          </Tooltip>
-        )}
-        {showRoomInfo && (
-          <Wrapper>
-            <IconButton className="close" onClick={() => setShowRoomInfo(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-            <RoomName>
-              <Avatar style={{ background: getColorByString(roomName) }}>
-                {getAvatarString(roomName)}
-              </Avatar>
-              <h3>{roomName}</h3>
-            </RoomName>
-            <RoomDescription>
-              <ArrowRightIcon /> ID: {roomId}
-            </RoomDescription>
-            <RoomDescription>
-              <ArrowRightIcon /> Description: {roomDescription}
-            </RoomDescription>
-            <p className="tip">
-              <LightbulbIcon />
-              Lien partageable bientôt disponible
-            </p>
-          </Wrapper>
-        )}
-        {showControlGuide && (
-          <Wrapper>
-            <Title>Contrôles</Title>
-            <IconButton className="close" onClick={() => setShowControlGuide(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-            <ul>
-              <li>
-                <strong>W, A, S, D ou fleches</strong> — se deplacer
-              </li>
-              <li>
-                <strong>E</strong> — s'asseoir / se lever (face a une chaise)
-              </li>
-              <li>
-                <strong>R</strong> — utiliser un ordinateur ou tableau blanc
-              </li>
-              <li>
-                <strong>M</strong> — rejoindre la reunion de zone
-              </li>
-              <li>
-                <strong>Entree</strong> — ouvrir le clavardage
-              </li>
-              <li>
-                <strong>ESC</strong> — fermer le clavardage
-              </li>
-              <li>
-                <strong>Molette</strong> ou <strong>+ / -</strong> — zoomer / dezoomer
-              </li>
-            </ul>
-            <p className="tip">
-              <LightbulbIcon />
-              Les zones de reunion activent l'appel video. Le Travail profond bloque les appels.
-            </p>
-          </Wrapper>
-        )}
-      </div>
-      <ButtonGroup>
+    <>
+      {/* Panels au-dessus du dock */}
+      {showRoomInfo && (
+        <InfoPanel>
+          <IconButton className="close" onClick={() => setShowRoomInfo(false)} size="small" sx={{ color: '#999' }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+          <RoomInfoName>
+            <Avatar style={{ background: getColorByString(roomName), width: 32, height: 32, fontSize: 14 }}>
+              {getAvatarString(roomName)}
+            </Avatar>
+            <h3>{roomName}</h3>
+          </RoomInfoName>
+          <RoomInfoRow>
+            <ArrowRightIcon sx={{ fontSize: 16 }} /> ID: {roomId}
+          </RoomInfoRow>
+          <RoomInfoRow>
+            <ArrowRightIcon sx={{ fontSize: 16 }} /> {roomDescription}
+          </RoomInfoRow>
+          <p className="tip">
+            <LightbulbIcon sx={{ fontSize: 16 }} />
+            Lien partageable bientot disponible
+          </p>
+        </InfoPanel>
+      )}
+      {showControlGuide && (
+        <InfoPanel>
+          <IconButton className="close" onClick={() => setShowControlGuide(false)} size="small" sx={{ color: '#999' }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: 16, textAlign: 'center' }}>Controles</h3>
+          <ul>
+            <li><strong>W, A, S, D</strong> — se deplacer</li>
+            <li><strong>E</strong> — s'asseoir / se lever</li>
+            <li><strong>R</strong> — utiliser un objet</li>
+            <li><strong>M</strong> — reunion de zone</li>
+            <li><strong>Entree</strong> — ouvrir le chat</li>
+            <li><strong>?</strong> — raccourcis clavier</li>
+            <li><strong>Molette / + -</strong> — zoomer</li>
+          </ul>
+          <p className="tip">
+            <LightbulbIcon sx={{ fontSize: 16 }} />
+            Les zones de reunion activent l'appel video.
+          </p>
+        </InfoPanel>
+      )}
+
+      {/* Dock bar horizontal en bas-centre */}
+      <DockBar>
         {roomJoined && (
           <>
-            <Tooltip title="Utilisateurs en ligne">
-              <StyledFab
-                size="small"
-                onClick={() => {
-                  setShowUserList(!showUserList)
-                  setShowRoomInfo(false)
-                  setShowControlGuide(false)
-                }}
-              >
-                <Badge badgeContent={playerCount} color="secondary" max={99}>
-                  <PeopleIcon />
-                </Badge>
-              </StyledFab>
+            <Tooltip title="Utilisateurs en ligne" placement="top">
+              {showUserList ? (
+                <ActiveDockButton size="small" onClick={() => toggle('users')}>
+                  <Badge badgeContent={playerCount} color="secondary" max={99}>
+                    <PeopleIcon />
+                  </Badge>
+                </ActiveDockButton>
+              ) : (
+                <DockButton size="small" onClick={() => toggle('users')}>
+                  <Badge badgeContent={playerCount} color="secondary" max={99}>
+                    <PeopleIcon />
+                  </Badge>
+                </DockButton>
+              )}
             </Tooltip>
-            <Tooltip title="Info salle">
-              <StyledFab
-                size="small"
-                onClick={() => {
-                  setShowRoomInfo(!showRoomInfo)
-                  setShowControlGuide(false)
-                  setShowUserList(false)
-                }}
-              >
-                <ShareIcon />
-              </StyledFab>
+            <Tooltip title="Info salle" placement="top">
+              {showRoomInfo ? (
+                <ActiveDockButton size="small" onClick={() => toggle('room')}>
+                  <ShareIcon />
+                </ActiveDockButton>
+              ) : (
+                <DockButton size="small" onClick={() => toggle('room')}>
+                  <ShareIcon />
+                </DockButton>
+              )}
             </Tooltip>
-            <Tooltip title="Guide des contrôles">
-              <StyledFab
-                size="small"
-                onClick={() => {
-                  setShowControlGuide(!showControlGuide)
-                  setShowRoomInfo(false)
-                  setShowUserList(false)
-                }}
-              >
-                <HelpOutlineIcon />
-              </StyledFab>
+            <Tooltip title="Guide des controles" placement="top">
+              {showControlGuide ? (
+                <ActiveDockButton size="small" onClick={() => toggle('control')}>
+                  <HelpOutlineIcon />
+                </ActiveDockButton>
+              ) : (
+                <DockButton size="small" onClick={() => toggle('control')}>
+                  <HelpOutlineIcon />
+                </DockButton>
+              )}
             </Tooltip>
-            <Tooltip title="Parametres media">
-              <StyledFab
+            <Tooltip title="Parametres media" placement="top">
+              <DockButton
                 size="small"
                 onClick={() => {
                   dispatch(openMediaSettings())
-                  setShowRoomInfo(false)
-                  setShowControlGuide(false)
-                  setShowUserList(false)
+                  closeAll()
                 }}
               >
                 <SettingsIcon />
-              </StyledFab>
+              </DockButton>
+            </Tooltip>
+            <Tooltip title="Tableau de bord" placement="top">
+              <DockButton
+                size="small"
+                onClick={() => {
+                  dispatch(toggleDashboard())
+                  closeAll()
+                }}
+              >
+                <DashboardIcon />
+              </DockButton>
+            </Tooltip>
+            <Tooltip title="Statistiques" placement="top">
+              {analyticsOpen ? (
+                <ActiveDockButton
+                  size="small"
+                  onClick={() => {
+                    dispatch(toggleAnalyticsPanel())
+                    closeAll()
+                  }}
+                >
+                  <BarChartIcon />
+                </ActiveDockButton>
+              ) : (
+                <DockButton
+                  size="small"
+                  onClick={() => {
+                    dispatch(toggleAnalyticsPanel())
+                    closeAll()
+                  }}
+                >
+                  <BarChartIcon />
+                </DockButton>
+              )}
+            </Tooltip>
+            <Tooltip title="Badges" placement="top">
+              {badgePanelOpen ? (
+                <ActiveDockButton
+                  size="small"
+                  onClick={() => {
+                    dispatch(toggleBadgePanel())
+                    closeAll()
+                  }}
+                >
+                  <Badge variant={newBadgeId ? 'dot' : 'standard'} color="warning" invisible={!newBadgeId}>
+                    <EmojiEventsIcon />
+                  </Badge>
+                </ActiveDockButton>
+              ) : (
+                <DockButton
+                  size="small"
+                  onClick={() => {
+                    dispatch(toggleBadgePanel())
+                    closeAll()
+                  }}
+                >
+                  <Badge variant={newBadgeId ? 'dot' : 'standard'} color="warning" invisible={!newBadgeId}>
+                    <EmojiEventsIcon />
+                  </Badge>
+                </DockButton>
+              )}
+            </Tooltip>
+            <Separator />
+            <Tooltip title={showJoystick ? 'Desactiver le joystick' : 'Activer le joystick'} placement="top">
+              <DockButton size="small" onClick={() => dispatch(setShowJoystick(!showJoystick))}>
+                {showJoystick ? <VideogameAssetOffIcon /> : <VideogameAssetIcon />}
+              </DockButton>
             </Tooltip>
           </>
         )}
-        <Tooltip title="Changer le thème">
-          <StyledFab size="small" onClick={() => dispatch(toggleBackgroundMode())}>
+        <Tooltip title="Changer le theme" placement="top">
+          <DockButton size="small" onClick={() => dispatch(toggleBackgroundMode())}>
             {backgroundMode === BackgroundMode.DAY ? <DarkModeIcon /> : <LightModeIcon />}
-          </StyledFab>
+          </DockButton>
         </Tooltip>
-      </ButtonGroup>
+      </DockBar>
+
+      {/* User list panel */}
       {showUserList && <UserListPanel onClose={() => setShowUserList(false)} />}
-    </Backdrop>
+    </>
   )
 }

@@ -8,7 +8,7 @@ type Payload = {
 }
 
 export default class PlayerUpdateNameCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, name } = data
 
     const player = this.room.state.players.get(client.sessionId)

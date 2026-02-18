@@ -15,6 +15,7 @@ import {
   setPeerConnectionState,
   removePeerConnectionState,
 } from '../stores/MeetingStore'
+import { clearMeetingTools } from '../stores/MeetingToolsStore'
 import { Message } from '../../../types/Messages'
 import { buildMediaConstraints } from './mediaDevices'
 
@@ -440,6 +441,7 @@ export default class ZoneMeetingManager {
 
     // Reinitialiser l'etat Redux du meeting
     store.dispatch(clearMeetingState())
+    store.dispatch(clearMeetingTools())
 
     this.currentZone = null
     this.currentMembers = []
@@ -471,15 +473,17 @@ export default class ZoneMeetingManager {
       const sanitizedId = this.replaceInvalidId(memberId)
 
       // Fermer l'appel video webcam
-      if (this.videoPeers.has(sanitizedId)) {
-        this.videoPeers.get(sanitizedId)!.close()
+      const videoPeer = this.videoPeers.get(sanitizedId)
+      if (videoPeer) {
+        videoPeer.close()
         this.videoPeers.delete(sanitizedId)
         store.dispatch(removePeerVideoStream(sanitizedId))
       }
 
       // Fermer l'appel de partage d'ecran entrant
-      if (this.screenIncoming.has(sanitizedId)) {
-        this.screenIncoming.get(sanitizedId)!.close()
+      const screenPeer = this.screenIncoming.get(sanitizedId)
+      if (screenPeer) {
+        screenPeer.close()
         this.screenIncoming.delete(sanitizedId)
         store.dispatch(removePeerScreenStream(sanitizedId))
       }
@@ -684,8 +688,9 @@ export default class ZoneMeetingManager {
     const sanitizedId = this.replaceInvalidId(peerId)
 
     // Fermer la connexion entrante si elle existe
-    if (this.screenIncoming.has(sanitizedId)) {
-      this.screenIncoming.get(sanitizedId)!.close()
+    const incomingCall = this.screenIncoming.get(sanitizedId)
+    if (incomingCall) {
+      incomingCall.close()
       this.screenIncoming.delete(sanitizedId)
     }
 

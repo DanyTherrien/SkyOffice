@@ -10,7 +10,7 @@ export default class Background extends Phaser.Scene {
     super('background')
   }
 
-  create(data: { backgroundMode: BackgroundMode }) {
+  create(data: { backgroundMode: BackgroundMode }): void {
     const sceneHeight = this.cameras.main.height
     const sceneWidth = this.cameras.main.width
 
@@ -23,6 +23,12 @@ export default class Background extends Phaser.Scene {
       this.backdropKey = 'backdrop_night'
       this.cloudKey = 'cloud_night'
       this.cameras.main.setBackgroundColor('#2c4464')
+    }
+
+    // Notifier la scene Game du mode jour/nuit
+    const gameScene = this.scene.get('game')
+    if (gameScene) {
+      gameScene.events.emit('background-mode-changed', data.backgroundMode)
     }
 
     // Add backdrop image
@@ -50,7 +56,7 @@ export default class Background extends Phaser.Scene {
     }
   }
 
-  update(t: number, dt: number) {
+  update(): void {
     this.physics.world.wrap(this.cloud, 500)
   }
 }

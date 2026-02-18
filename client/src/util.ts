@@ -1,4 +1,4 @@
-export function sanitizeId(id: string) {
+export function sanitizeId(id: string): string {
   let sanitized = id
 
   if (sanitized.length > 9 && sanitized.endsWith('-ss')) {
@@ -20,11 +20,11 @@ const colorArr = [
 ]
 
 // determine name color by first character charCode
-export function getColorByString(string: string) {
+export function getColorByString(string: string): string {
   return colorArr[Math.floor(string.charCodeAt(0) % colorArr.length)]
 }
 
-export function getAvatarString(name: string) {
+export function getAvatarString(name: string): string {
   const part = name.split(' ')
   return part.length < 2 ? part[0][0] : part[0][0] + part[1][0]
 }

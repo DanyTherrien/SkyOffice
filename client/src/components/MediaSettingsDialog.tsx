@@ -36,6 +36,7 @@ import {
 import { requestDesktopPermission } from '../web/notificationService'
 import phaserGame from '../PhaserGame'
 import Game from '../scenes/Game'
+import type { AudioPrefs } from '../scenes/AudioManager'
 
 /* ─── Styled components ─── */
 
@@ -192,7 +193,7 @@ function playTestTone(volume: number, speakerId: string) {
 
   // Si setSinkId est disponible sur le contexte, on essaie
   if (speakerId && (ctx as any).setSinkId) {
-    (ctx as any).setSinkId(speakerId).catch((_e: unknown) => {
+    (ctx as any).setSinkId(speakerId).catch(() => {
       // setSinkId non supporte sur ce navigateur
     })
   }
@@ -202,7 +203,7 @@ function playTestTone(volume: number, speakerId: string) {
   oscillator.onended = () => ctx.close()
 }
 
-export default function MediaSettingsDialog() {
+export default function MediaSettingsDialog(): JSX.Element | null {
   const dispatch = useAppDispatch()
   const settings = useAppSelector((s) => s.mediaSettings)
   const notifSettings = useAppSelector((s) => s.notification)
@@ -213,6 +214,14 @@ export default function MediaSettingsDialog() {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([])
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([])
 
+  // Preferences audio d'ambiance
+  const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>({
+    ambientEnabled: true,
+    sfxEnabled: true,
+    ambientVolume: 0.3,
+    sfxVolume: 0.5,
+  })
+
   // Stream de preview (separe du stream de reunion)
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
@@ -222,6 +231,22 @@ export default function MediaSettingsDialog() {
 
   // Ref pour eviter les startPreview en cascade
   const mountedRef = useRef(true)
+
+  const getAudioManager = useCallback(() => {
+    try {
+      const game = phaserGame.scene.keys.game as Game
+      return game.audioManager ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  // Charger les prefs audio a l'ouverture du dialog
+  useEffect(() => {
+    if (!settings.dialogOpen) return
+    const am = getAudioManager()
+    if (am) setAudioPrefs(am.getPrefs())
+  }, [settings.dialogOpen, getAudioManager])
 
   const refreshDeviceList = useCallback(async () => {
     try {
@@ -542,6 +567,84 @@ export default function MediaSettingsDialog() {
           sx={{ color: '#ccc', '& .MuiFormControlLabel-label': { fontSize: 14 }, mt: 1 }}
         />
         <HintText>Recevez des alertes meme quand l'onglet est en arriere-plan</HintText>
+
+        {/* ─── Audio d'ambiance ─── */}
+        <SectionTitle>Audio d'ambiance</SectionTitle>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={audioPrefs.ambientEnabled}
+              onChange={(e) => {
+                const v = e.target.checked
+                setAudioPrefs((p) => ({ ...p, ambientEnabled: v }))
+                getAudioManager()?.setAmbientEnabled(v)
+              }}
+              size="small"
+              sx={switchSx}
+            />
+          }
+          label="Musique d'ambiance par zone"
+          sx={{ color: '#ccc', '& .MuiFormControlLabel-label': { fontSize: 14 } }}
+        />
+        <HintText>Boucle sonore qui change selon la zone (brainstorm, meeting, etc.)</HintText>
+
+        <VolumeRow>
+          <VolumeUpIcon sx={{ color: '#999', fontSize: 20 }} />
+          <Slider
+            value={Math.round(audioPrefs.ambientVolume * 100)}
+            onChange={(_, v) => {
+              const vol = (v as number) / 100
+              setAudioPrefs((p) => ({ ...p, ambientVolume: vol }))
+              getAudioManager()?.setAmbientVolume(vol)
+            }}
+            min={0}
+            max={100}
+            disabled={!audioPrefs.ambientEnabled}
+            sx={{ color: '#14B8A6', flex: 1 }}
+            size="small"
+          />
+          <span style={{ fontSize: 13, minWidth: 36, textAlign: 'right' }}>
+            {Math.round(audioPrefs.ambientVolume * 100)}%
+          </span>
+        </VolumeRow>
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={audioPrefs.sfxEnabled}
+              onChange={(e) => {
+                const v = e.target.checked
+                setAudioPrefs((p) => ({ ...p, sfxEnabled: v }))
+                getAudioManager()?.setSfxEnabled(v)
+              }}
+              size="small"
+              sx={switchSx}
+            />
+          }
+          label="Effets sonores"
+          sx={{ color: '#ccc', '& .MuiFormControlLabel-label': { fontSize: 14 }, mt: 1 }}
+        />
+        <HintText>Sons lors des changements de zone, messages chat, join/leave</HintText>
+
+        <VolumeRow>
+          <VolumeUpIcon sx={{ color: '#999', fontSize: 20 }} />
+          <Slider
+            value={Math.round(audioPrefs.sfxVolume * 100)}
+            onChange={(_, v) => {
+              const vol = (v as number) / 100
+              setAudioPrefs((p) => ({ ...p, sfxVolume: vol }))
+              getAudioManager()?.setSfxVolume(vol)
+            }}
+            min={0}
+            max={100}
+            disabled={!audioPrefs.sfxEnabled}
+            sx={{ color: '#14B8A6', flex: 1 }}
+            size="small"
+          />
+          <span style={{ fontSize: 13, minWidth: 36, textAlign: 'right' }}>
+            {Math.round(audioPrefs.sfxVolume * 100)}%
+          </span>
+        </VolumeRow>
       </DialogWrapper>
     </Backdrop>
   )

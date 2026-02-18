@@ -2,7 +2,7 @@
  * Sons de notification synthetises via Web Audio API.
  * Zero dependance, zero fichier audio a charger.
  */
-export function playNotificationSound(type: 'enter' | 'leave' | 'message') {
+export function playNotificationSound(type: 'enter' | 'leave' | 'message'): void {
   try {
     const ctx = new AudioContext()
     const gain = ctx.createGain()

@@ -126,7 +126,7 @@ const ButtonsRow = styled.div`
   margin-top: 8px;
 `
 
-export default function MeetingPreviewDialog() {
+export default function MeetingPreviewDialog(): JSX.Element | null {
   const dispatch = useAppDispatch()
   const showPreview = useAppSelector((s) => s.meeting.showMeetingPreview)
   const pendingZone = useAppSelector((s) => s.meeting.pendingZone)

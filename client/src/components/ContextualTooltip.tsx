@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useAppSelector } from '../hooks'
-import { ZONE_NAMES } from '../constants'
 import phaserGame from '../PhaserGame'
 import Game from '../scenes/Game'
 
@@ -70,7 +69,7 @@ const TipIcon = styled.span`
   font-size: 16px;
 `
 
-export default function ContextualTooltip() {
+export default function ContextualTooltip(): JSX.Element | null {
   const loggedIn = useAppSelector((state) => state.user.loggedIn)
   const [currentTip, setCurrentTip] = useState<string | null>(null)
   const [fading, setFading] = useState(false)

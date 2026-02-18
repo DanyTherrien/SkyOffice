@@ -3,6 +3,7 @@
  * Joue des sons et envoie des notifications desktop selon les preferences utilisateur.
  */
 import store from '../stores'
+import { pushToast } from '../stores/ToastStore'
 import { playNotificationSound } from './notificationSounds'
 import { ZONE_NAMES } from '../constants'
 
@@ -53,14 +54,25 @@ export async function requestDesktopPermission(): Promise<boolean> {
   }
 }
 
+/** Verifie si le joueur local est dans la zone AFK (pas besoin de notifications) */
+function isLocalPlayerAfk(): boolean {
+  const state = store.getState().user
+  if (!state.sessionId) return false
+  const sanitizedId = state.sessionId.replace(/[^0-9a-z]/gi, 'G')
+  const myZone = state.playerZoneMap.get(sanitizedId)
+  return myZone === 'afk'
+}
+
 // ─── Notifications specifiques ──────────────────────────────────────────────
 
 /** Un collegue entre dans votre zone */
-export function notifyPlayerEnteredZone(playerName: string, zone: string) {
+export function notifyPlayerEnteredZone(playerName: string, zone: string): void {
+  if (isLocalPlayerAfk()) return
   if (isSoundEnabled()) {
     playNotificationSound('enter')
   }
   const zoneName = ZONE_NAMES[zone] || zone
+  store.dispatch(pushToast({ message: `${playerName} est entre(e) dans ${zoneName}` }))
   sendDesktopNotification(
     'Capturia Office',
     `${playerName} est entre(e) dans ${zoneName}`
@@ -68,11 +80,13 @@ export function notifyPlayerEnteredZone(playerName: string, zone: string) {
 }
 
 /** Un collegue quitte votre zone */
-export function notifyPlayerLeftZone(playerName: string, zone: string) {
+export function notifyPlayerLeftZone(playerName: string, zone: string): void {
+  if (isLocalPlayerAfk()) return
   if (isSoundEnabled()) {
     playNotificationSound('leave')
   }
   const zoneName = ZONE_NAMES[zone] || zone
+  store.dispatch(pushToast({ message: `${playerName} a quitte ${zoneName}` }))
   sendDesktopNotification(
     'Capturia Office',
     `${playerName} a quitte ${zoneName}`
@@ -80,7 +94,8 @@ export function notifyPlayerLeftZone(playerName: string, zone: string) {
 }
 
 /** Nouveau message de chat */
-export function notifyChatMessage(author: string, content: string) {
+export function notifyChatMessage(author: string, content: string): void {
+  if (isLocalPlayerAfk()) return
   if (isSoundEnabled()) {
     playNotificationSound('message')
   }
@@ -92,10 +107,12 @@ export function notifyChatMessage(author: string, content: string) {
 }
 
 /** Un collegue rejoint le bureau */
-export function notifyPlayerJoinedOffice(playerName: string) {
+export function notifyPlayerJoinedOffice(playerName: string): void {
+  if (isLocalPlayerAfk()) return
   if (isSoundEnabled()) {
     playNotificationSound('enter')
   }
+  store.dispatch(pushToast({ message: `${playerName} a rejoint le bureau`, type: 'success' }))
   sendDesktopNotification(
     'Capturia Office',
     `${playerName} a rejoint le bureau`
@@ -103,10 +120,12 @@ export function notifyPlayerJoinedOffice(playerName: string) {
 }
 
 /** Un collegue quitte le bureau */
-export function notifyPlayerLeftOffice(playerName: string) {
+export function notifyPlayerLeftOffice(playerName: string): void {
+  if (isLocalPlayerAfk()) return
   if (isSoundEnabled()) {
     playNotificationSound('leave')
   }
+  store.dispatch(pushToast({ message: `${playerName} a quitte le bureau`, type: 'warning' }))
   sendDesktopNotification(
     'Capturia Office',
     `${playerName} a quitte le bureau`

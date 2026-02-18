@@ -1,4 +1,4 @@
-export function openURL(url: string) {
+export function openURL(url: string): void {
   const canOpenNewTab = window.open(url, '_blank')
 
   // if the browser blocks the new tab, open the url in the current tab

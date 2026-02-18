@@ -48,7 +48,9 @@ export const computerSlice = createSlice({
       // Tell server the computer dialog is closed.
       const game = phaserGame.scene.keys.game as Game
       game.enableKeys()
-      game.network.disconnectFromComputer(state.computerId!)
+      if (state.computerId) {
+        game.network.disconnectFromComputer(state.computerId)
+      }
       for (const { call } of state.peerStreams.values()) {
         call.close()
       }

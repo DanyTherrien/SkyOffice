@@ -51,13 +51,13 @@ export default class ShareScreenManager {
     })
   }
 
-  onOpen() {
+  onOpen(): void {
     if (this.myPeer.disconnected) {
       this.myPeer.reconnect()
     }
   }
 
-  onClose() {
+  onClose(): void {
     this.stopScreenShare(false)
     this.myPeer.disconnect()
   }
@@ -69,7 +69,7 @@ export default class ShareScreenManager {
     return `${id.replace(/[^0-9a-z]/gi, 'G')}-ss`
   }
 
-  startScreenShare() {
+  startScreenShare(): void {
     navigator.mediaDevices
       ?.getDisplayMedia({
         video: true,
@@ -90,7 +90,8 @@ export default class ShareScreenManager {
 
         // Call all existing users.
         const game = phaserGame.scene.keys.game as Game
-        const computerItem = game.computerMap.get(store.getState().computer.computerId!)
+        const computerId = store.getState().computer.computerId
+        const computerItem = computerId ? game.computerMap.get(computerId) : undefined
         if (computerItem) {
           for (const userId of computerItem.currentUsers) {
             this.onUserJoined(userId)
@@ -102,25 +103,28 @@ export default class ShareScreenManager {
   // TODO(daxchen): Fix this trash hack, if we call store.dispatch here when calling
   // from onClose, it causes redux reducer cycle, this may be fixable by using thunk
   // or something.
-  stopScreenShare(shouldDispatch = true) {
+  stopScreenShare(shouldDispatch = true): void {
     this.myStream?.getTracks().forEach((track) => track.stop())
     this.myStream = undefined
     if (shouldDispatch) {
       store.dispatch(setMyStream(null))
       // Manually let all other existing users know screen sharing is stopped
       const game = phaserGame.scene.keys.game as Game
-      game.network.onStopScreenShare(store.getState().computer.computerId!)
+      const currentComputerId = store.getState().computer.computerId
+      if (currentComputerId) {
+        game.network.onStopScreenShare(currentComputerId)
+      }
     }
   }
 
-  onUserJoined(userId: string) {
+  onUserJoined(userId: string): void {
     if (!this.myStream || userId === this.userId) return
 
     const sanatizedId = this.makeId(userId)
     this.myPeer.call(sanatizedId, this.myStream)
   }
 
-  onUserLeft(userId: string) {
+  onUserLeft(userId: string): void {
     if (userId === this.userId) return
 
     const sanatizedId = this.makeId(userId)

@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
-import Badge from '@mui/material/Badge'
 import CloseIcon from '@mui/icons-material/Close'
 import MinimizeIcon from '@mui/icons-material/Minimize'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
@@ -24,7 +23,10 @@ import Game from '../scenes/Game'
 import VideoTileGrid from './meeting/VideoTileGrid'
 import ScreenShareArea from './meeting/ScreenShareArea'
 import MeetingToolbar from './meeting/MeetingToolbar'
+import RecordingBanner from './RecordingBanner'
+import MeetingTools from './MeetingTools'
 import { ZONE_NAMES } from '../constants'
+import { sanitizeId } from '../util'
 
 /**
  * Overlay flottant de meeting par zone.
@@ -95,6 +97,32 @@ const MemberCount = styled.span`
   text-align: center;
 `
 
+/** Mini-avatars des participants */
+const AvatarRow = styled.div`
+  display: flex;
+  gap: 0;
+  margin-left: 4px;
+`
+
+const MiniAvatar = styled.div<{ $color: string }>`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  border: 2px solid #1a1d30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  margin-left: -6px;
+
+  &:first-child {
+    margin-left: 0;
+  }
+`
+
 /** Boutons de l'en-tete (minimiser, fermer) */
 const HeaderActions = styled.div`
   display: flex;
@@ -147,9 +175,22 @@ const MiniIconButton = styled(IconButton)<{ $danger?: boolean }>`
   }
 `
 
+// ─── Couleurs deterministes pour les mini-avatars ─────────────────────────────
+
+const AVATAR_COLORS = [
+  '#14B8A6', '#f59e0b', '#8b5cf6', '#ef4444',
+  '#3b82f6', '#22c55e', '#ec4899', '#f97316',
+]
+
+function avatarColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function ZoneMeetingOverlay() {
+export default function ZoneMeetingOverlay(): JSX.Element | null {
   const dispatch = useAppDispatch()
 
   // Etat Redux
@@ -159,6 +200,7 @@ export default function ZoneMeetingOverlay() {
   const zoneMemberIds = useAppSelector((state) => state.meeting.zoneMemberIds)
   const micEnabled = useAppSelector((state) => state.meeting.micEnabled)
   const cameraEnabled = useAppSelector((state) => state.meeting.cameraEnabled)
+  const playerNameMap = useAppSelector((state) => state.user.playerNameMap)
 
   // Position du deplacement (drag)
   const [position, setPosition] = useState({ x: window.innerWidth - 396, y: 80 })
@@ -249,8 +291,8 @@ export default function ZoneMeetingOverlay() {
 
   // ─── Conditions de rendu ───────────────────────────────────────────────────
 
-  // Ne pas afficher si aucune zone active, ou si c'est deep_work, ou si l'overlay est ferme
-  if (!activeZone || activeZone === 'deep_work' || !overlayOpen) return null
+  // Ne pas afficher si aucune zone active, ou si c'est deep_work/afk, ou si l'overlay est ferme
+  if (!activeZone || activeZone === 'deep_work' || activeZone === 'afk' || !overlayOpen) return null
 
   const zoneName = ZONE_NAMES[activeZone] || activeZone
   const memberCount = zoneMemberIds.length
@@ -312,6 +354,21 @@ export default function ZoneMeetingOverlay() {
         <ZoneInfo>
           <h4>{zoneName}</h4>
           <MemberCount>{memberCount}</MemberCount>
+          <AvatarRow>
+            {zoneMemberIds.slice(0, 6).map((id) => {
+              const name = playerNameMap.get(sanitizeId(id)) || '?'
+              return (
+                <MiniAvatar key={id} $color={avatarColor(id)} title={name}>
+                  {name.charAt(0).toUpperCase()}
+                </MiniAvatar>
+              )
+            })}
+            {zoneMemberIds.length > 6 && (
+              <MiniAvatar $color="#555" title={`+${zoneMemberIds.length - 6} autres`}>
+                +{zoneMemberIds.length - 6}
+              </MiniAvatar>
+            )}
+          </AvatarRow>
         </ZoneInfo>
         <HeaderActions>
           <Tooltip title="Minimiser" arrow>
@@ -327,6 +384,9 @@ export default function ZoneMeetingOverlay() {
         </HeaderActions>
       </Header>
 
+      {/* Banniere d'enregistrement (visible par tous les participants) */}
+      <RecordingBanner />
+
       {/* Contenu scrollable */}
       <ContentArea>
         {/* Zone de partage d'ecran (s'affiche si au moins un partage actif) */}
@@ -338,6 +398,9 @@ export default function ZoneMeetingOverlay() {
 
       {/* Barre d'outils */}
       <MeetingToolbar />
+
+      {/* Panneau lateral des outils de reunion (minuteur, agenda, notes) */}
+      <MeetingTools />
     </OverlayContainer>
   )
 }

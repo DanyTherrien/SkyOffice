@@ -12,7 +12,6 @@ import Game from '../scenes/Game'
 // Carte: 768x576 px → ratio 4:3
 // Minimap: 180x135 px (echelle ~0.234)
 const MAP_W = 768
-const MAP_H = 576
 const MINI_W = 180
 const MINI_H = 135
 const SCALE = MINI_W / MAP_W
@@ -31,6 +30,8 @@ const ZONE_COLORS: Record<string, string> = {
   meeting: '#f59e0b',
   deep_work: '#8b5cf6',
   sales: '#22c55e',
+  afk: '#6b7280',
+  one_on_one: '#ec4899',
 }
 
 const Wrapper = styled.div`
@@ -140,7 +141,7 @@ function getOtherPlayerPositions(): Map<string, { x: number; y: number }> {
   return positions
 }
 
-export default function Minimap() {
+export default function Minimap(): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const loggedIn = useAppSelector((state) => state.user.loggedIn)
   const playerNameMap = useAppSelector((state) => state.user.playerNameMap)

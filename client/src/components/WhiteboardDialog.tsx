@@ -49,7 +49,7 @@ const WhiteboardWrapper = styled.div`
   }
 `
 
-export default function WhiteboardDialog() {
+export default function WhiteboardDialog(): JSX.Element {
   const whiteboardUrl = useAppSelector((state) => state.whiteboard.whiteboardUrl)
   const dispatch = useAppDispatch()
 

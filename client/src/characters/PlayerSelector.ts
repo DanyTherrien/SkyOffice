@@ -12,7 +12,7 @@ export default class PlayerSelector extends Phaser.GameObjects.Zone {
     scene.physics.add.existing(this)
   }
 
-  update(player: MyPlayer, cursors: NavKeys) {
+  update(player: MyPlayer, cursors: NavKeys): void {
     if (!cursors) {
       return
     }

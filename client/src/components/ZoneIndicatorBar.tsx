@@ -48,9 +48,8 @@ const CountChip = styled.span`
   font-size: 12px;
 `
 
-export default function ZoneIndicatorBar() {
+export default function ZoneIndicatorBar(): JSX.Element | null {
   const loggedIn = useAppSelector((state) => state.user.loggedIn)
-  const playerNameMap = useAppSelector((state) => state.user.playerNameMap)
   const playerZoneMap = useAppSelector((state) => state.user.playerZoneMap)
 
   if (!loggedIn) return null

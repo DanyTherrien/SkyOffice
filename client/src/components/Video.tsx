@@ -4,7 +4,7 @@ type PropsType = VideoHTMLAttributes<HTMLVideoElement> & {
   srcObject: MediaStream
 }
 
-export default function Video({ srcObject, ...props }: PropsType) {
+export default function Video({ srcObject, ...props }: PropsType): JSX.Element {
   const refVideo = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {

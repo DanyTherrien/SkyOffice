@@ -14,6 +14,11 @@ module.exports = {
 		'@typescript-eslint/ban-ts-ignore': 0,
 		'@typescript-eslint/no-namespace': [0, { 'allowDeclarations': true }],
 		'@typescript-eslint/member-delimiter-style': 0,
-		'@typescript-eslint/no-explicit-any': 0
+		'@typescript-eslint/no-explicit-any': 0,
+		'@typescript-eslint/no-unused-vars': ['warn', {
+			'argsIgnorePattern': '^_',
+			'varsIgnorePattern': '^(type|_)',
+			'ignoreRestSiblings': true
+		}]
 	}
 }

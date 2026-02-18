@@ -108,15 +108,6 @@ const ButtonRow = styled.div`
   gap: 12px;
 `
 
-const CloseBtn = styled(IconButton)`
-  && {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    color: #999;
-  }
-`
-
 const slides = [
   {
     icon: <KeyboardIcon sx={{ fontSize: 48, color: '#14B8A6' }} />,
@@ -187,7 +178,7 @@ const slides = [
   },
 ]
 
-export default function OnboardingOverlay() {
+export default function OnboardingOverlay(): JSX.Element | null {
   const [step, setStep] = useState(0)
   const [dismissed, setDismissed] = useState(false)
   const loggedIn = useAppSelector((state) => state.user.loggedIn)

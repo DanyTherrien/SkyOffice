@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react'
 import styled from 'styled-components'
 import Box from '@mui/material/Box'
 import Fab from '@mui/material/Fab'
-import Badge from '@mui/material/Badge'
 import Tooltip from '@mui/material/Tooltip'
 import IconButton from '@mui/material/IconButton'
 import InputBase from '@mui/material/InputBase'
@@ -202,7 +201,7 @@ const Message = ({ chatMessage, messageType }) => {
   )
 }
 
-export default function Chat() {
+export default function Chat(): JSX.Element {
   const [inputValue, setInputValue] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [readyToSubmit, setReadyToSubmit] = useState(false)

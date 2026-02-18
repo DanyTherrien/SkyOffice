@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import JoystickItem from './Joystick'
 
@@ -42,7 +42,7 @@ const isSmallScreen = (smallScreenSize: number) => {
   return width <= smallScreenSize
 }
 
-export default function MobileVirtualJoystick() {
+export default function MobileVirtualJoystick(): JSX.Element | null {
   const showJoystick = useAppSelector((state) => state.user.showJoystick)
   const showChat = useAppSelector((state) => state.chat.showChat)
   const hasSmallScreen = isSmallScreen(minimumScreenWidthSize)

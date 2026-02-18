@@ -10,6 +10,7 @@ export enum MessageType {
   REGULAR_MESSAGE,
   ZONE_ENTER,
   ZONE_LEAVE,
+  BOT_MESSAGE,
 }
 
 export const chatSlice = createSlice({
@@ -21,6 +22,7 @@ export const chatSlice = createSlice({
     chatTab: 'zone' as 'zone' | 'general',
     unreadGeneralCount: 0,
     unreadZoneCount: 0,
+    botTyping: false,
   },
   reducers: {
     pushChatMessage: (state, action: PayloadAction<IChatMessage>) => {
@@ -88,6 +90,48 @@ export const chatSlice = createSlice({
         zone: action.payload.zone,
       })
     },
+    pushAfkEnterMessage: (state, action: PayloadAction<string>) => {
+      state.chatMessages.push({
+        messageType: MessageType.ZONE_ENTER,
+        chatMessage: {
+          createdAt: new Date().getTime(),
+          author: action.payload,
+          content: 'est en pause',
+        } as IChatMessage,
+        zone: 'afk',
+      })
+    },
+    pushAfkLeaveMessage: (state, action: PayloadAction<string>) => {
+      state.chatMessages.push({
+        messageType: MessageType.ZONE_LEAVE,
+        chatMessage: {
+          createdAt: new Date().getTime(),
+          author: action.payload,
+          content: 'est de retour',
+        } as IChatMessage,
+        zone: 'afk',
+      })
+    },
+    pushBotMessage: (state, action: PayloadAction<string>) => {
+      state.chatMessages.push({
+        messageType: MessageType.BOT_MESSAGE,
+        chatMessage: {
+          createdAt: new Date().getTime(),
+          author: 'Crea \uD83E\uDD16',
+          content: action.payload,
+        } as IChatMessage,
+        zone: 'brainstorm',
+      })
+      // Incrementer le compteur non-lu si on n'est pas sur l'onglet zone
+      if (state.chatTab !== 'zone') {
+        state.unreadZoneCount++
+      }
+      // Desactiver l'indicateur de reflexion
+      state.botTyping = false
+    },
+    setBotTyping: (state, action: PayloadAction<boolean>) => {
+      state.botTyping = action.payload
+    },
     setChatTab: (state, action: PayloadAction<'zone' | 'general'>) => {
       state.chatTab = action.payload
       if (action.payload === 'general') {
@@ -106,6 +150,10 @@ export const chatSlice = createSlice({
       const game = phaserGame.scene.keys.game as Game
       action.payload ? game.disableKeys() : game.enableKeys()
       state.focused = action.payload
+
+      // 3A — Envoyer le statut de typing au serveur + mettre a jour le sprite local
+      game.myPlayer?.updateTypingIndicator(action.payload)
+      game.network?.sendTypingStatus(action.payload)
     },
     setShowChat: (state, action: PayloadAction<boolean>) => {
       state.showChat = action.payload
@@ -119,6 +167,10 @@ export const {
   pushPlayerLeftMessage,
   pushZoneEnterMessage,
   pushZoneLeaveMessage,
+  pushAfkEnterMessage,
+  pushAfkLeaveMessage,
+  pushBotMessage,
+  setBotTyping,
   setChatTab,
   clearUnreadGeneral,
   clearUnreadZone,

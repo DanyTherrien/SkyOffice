@@ -10,6 +10,9 @@ export interface IPlayer extends Schema {
   zone: string
   role: string
   status: string
+  afkReason: string
+  salesStatus: string
+  observingTarget: string
 }
 
 export interface IComputer extends Schema {

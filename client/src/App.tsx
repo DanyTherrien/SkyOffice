@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import styled from 'styled-components'
 
 import { useAppSelector } from './hooks'
@@ -19,6 +19,26 @@ import ZoneIndicatorBar from './components/ZoneIndicatorBar'
 import Minimap from './components/Minimap'
 import OnboardingOverlay from './components/OnboardingOverlay'
 import ContextualTooltip from './components/ContextualTooltip'
+import EmojiReactionPicker from './components/EmojiReactionPicker'
+import ToastNotification from './components/ToastNotification'
+import LoadingScreen from './components/LoadingScreen'
+import PlayerProfileCard from './components/PlayerProfileCard'
+import ConnectionBanner from './components/ConnectionBanner'
+import KeyboardShortcutsOverlay from './components/KeyboardShortcutsOverlay'
+import DeferredMessageSummary from './components/DeferredMessageSummary'
+import DeepWorkOverlay from './components/DeepWorkOverlay'
+import PomodoroTimer from './components/PomodoroTimer'
+import AfkStatusPicker from './components/AfkStatusPicker'
+import SalesStatusIndicator from './components/SalesStatusIndicator'
+import ErrorBoundary from './components/ErrorBoundary'
+import ObserverIndicator from './components/ObserverIndicator'
+import KnockNotification from './components/KnockNotification'
+import BoothInviteNotification from './components/BoothInviteNotification'
+import BrainstormBotPanel from './components/BrainstormBotPanel'
+import StickyNotesBoard from './components/StickyNotesBoard'
+import DashboardPanel from './components/DashboardPanel'
+import AnalyticsPanel from './components/AnalyticsPanel'
+import BadgePanel from './components/BadgePanel'
 
 const Backdrop = styled.div`
   position: absolute;
@@ -26,11 +46,12 @@ const Backdrop = styled.div`
   width: 100%;
 `
 
-function App() {
+function App(): JSX.Element {
   const loggedIn = useAppSelector((state) => state.user.loggedIn)
   const computerDialogOpen = useAppSelector((state) => state.computer.computerDialogOpen)
   const whiteboardDialogOpen = useAppSelector((state) => state.whiteboard.whiteboardDialogOpen)
   const roomJoined = useAppSelector((state) => state.room.roomJoined)
+  const [pomodoroVisible, setPomodoroVisible] = useState(false)
 
   let ui: JSX.Element
   if (loggedIn) {
@@ -52,6 +73,9 @@ function App() {
           <LeaveMeetingConfirmDialog />
           <MobileVirtualJoystick />
           <ContextualTooltip />
+          <EmojiReactionPicker />
+          <AfkStatusPicker />
+          <SalesStatusIndicator />
         </>
       )
     }
@@ -64,13 +88,34 @@ function App() {
   }
 
   return (
-    <Backdrop>
-      {ui}
-      {/* Render HelperButtonGroup if no dialogs are opened. */}
-      {!computerDialogOpen && !whiteboardDialogOpen && <HelperButtonGroup />}
-      <MediaSettingsDialog />
-      <OnboardingOverlay />
-    </Backdrop>
+    <ErrorBoundary>
+      <Backdrop>
+        {ui}
+        {/* Render HelperButtonGroup if no dialogs are opened. */}
+        {!computerDialogOpen && !whiteboardDialogOpen && <HelperButtonGroup />}
+        <MediaSettingsDialog />
+        <OnboardingOverlay />
+        <ToastNotification />
+        <LoadingScreen />
+        <PlayerProfileCard />
+        <ConnectionBanner />
+        <KeyboardShortcutsOverlay />
+        <DeferredMessageSummary />
+        <DeepWorkOverlay
+          pomodoroVisible={pomodoroVisible}
+          onTogglePomodoro={() => setPomodoroVisible((v) => !v)}
+        />
+        <PomodoroTimer visible={pomodoroVisible} />
+        <ObserverIndicator />
+        <KnockNotification />
+        <BoothInviteNotification />
+        <BrainstormBotPanel />
+        <StickyNotesBoard />
+        <DashboardPanel />
+        <AnalyticsPanel />
+        <BadgePanel />
+      </Backdrop>
+    </ErrorBoundary>
   )
 }
 

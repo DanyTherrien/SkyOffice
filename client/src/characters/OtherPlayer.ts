@@ -24,7 +24,7 @@ export default class OtherPlayer extends Player {
     this.playContainerBody = this.playerContainer.body as Phaser.Physics.Arcade.Body
   }
 
-  updateOtherPlayer(field: string, value: number | string | boolean) {
+  updateOtherPlayer(field: string, value: number | string | boolean): void {
     switch (field) {
       case 'name':
         if (typeof value === 'string') {
@@ -77,14 +77,14 @@ export default class OtherPlayer extends Player {
     }
   }
 
-  destroy(fromScene?: boolean) {
+  destroy(fromScene?: boolean): void {
     this.playerContainer.destroy()
 
     super.destroy(fromScene)
   }
 
   /** preUpdate is called every frame for every game object. */
-  preUpdate(t: number, dt: number) {
+  preUpdate(t: number, dt: number): void {
     super.preUpdate(t, dt)
 
     // if Phaser has not updated the canvas (when the game tab is not active) for more than 1 sec

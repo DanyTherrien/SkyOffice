@@ -18,7 +18,7 @@ const zoneNames: Record<string, string> = {
   sales: 'Salle de ventes',
 }
 
-export default function LeaveMeetingConfirmDialog() {
+export default function LeaveMeetingConfirmDialog(): JSX.Element {
   const dispatch = useAppDispatch()
   const show = useAppSelector((state) => state.meeting.showLeaveConfirmDialog)
   const activeZone = useAppSelector((state) => state.meeting.activeZone)

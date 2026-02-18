@@ -133,7 +133,7 @@ const ScreenShareHeader = styled.div`
   }
 `
 
-export default function ScreenShareArea() {
+export default function ScreenShareArea(): JSX.Element | null {
   const dispatch = useAppDispatch()
   const myScreenStream = useAppSelector((state) => state.meeting.myScreenStream)
   const peerScreenStreams = useAppSelector((state) => state.meeting.peerScreenStreams)

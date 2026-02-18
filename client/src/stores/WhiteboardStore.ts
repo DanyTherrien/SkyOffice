@@ -32,7 +32,9 @@ export const whiteboardSlice = createSlice({
     closeWhiteboardDialog: (state) => {
       const game = phaserGame.scene.keys.game as Game
       game.enableKeys()
-      game.network.disconnectFromWhiteboard(state.whiteboardId!)
+      if (state.whiteboardId) {
+        game.network.disconnectFromWhiteboard(state.whiteboardId)
+      }
       state.whiteboardDialogOpen = false
       state.whiteboardId = null
       state.whiteboardUrl = null

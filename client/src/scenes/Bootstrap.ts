@@ -13,7 +13,7 @@ export default class Bootstrap extends Phaser.Scene {
     super('bootstrap')
   }
 
-  preload() {
+  preload(): void {
     this.load.atlas(
       'cloud_day',
       'assets/background/cloud_day.png',
@@ -53,10 +53,6 @@ export default class Bootstrap extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32,
     })
-    this.load.spritesheet('basement', 'assets/tileset/Basement.png', {
-      frameWidth: 32,
-      frameHeight: 32,
-    })
     this.load.spritesheet('generic', 'assets/tileset/Generic.png', {
       frameWidth: 32,
       frameHeight: 32,
@@ -69,13 +65,28 @@ export default class Bootstrap extends Phaser.Scene {
       })
     }
 
+    // ─── Audio: boucles ambiantes par zone ───────────────────────────────
+    this.load.audio('ambient_brainstorm', 'assets/audio/ambient_brainstorm.wav')
+    this.load.audio('ambient_meeting', 'assets/audio/ambient_meeting.wav')
+    this.load.audio('ambient_deepwork', 'assets/audio/ambient_deepwork.wav')
+    this.load.audio('ambient_sales', 'assets/audio/ambient_sales.wav')
+
+    // ─── Audio: effets sonores ───────────────────────────────────────────
+    this.load.audio('sfx_zone_chime', 'assets/audio/sfx_zone_chime.wav')
+    this.load.audio('sfx_chat_pop', 'assets/audio/sfx_chat_pop.wav')
+    this.load.audio('sfx_player_join', 'assets/audio/sfx_player_join.wav')
+    this.load.audio('sfx_player_leave', 'assets/audio/sfx_player_leave.wav')
+    this.load.audio('sfx_meeting_start', 'assets/audio/sfx_meeting_start.wav')
+    this.load.audio('sfx_ui_click', 'assets/audio/sfx_ui_click.wav')
+    this.load.audio('sfx_notification', 'assets/audio/sfx_notification.wav')
+
     this.load.on('complete', () => {
       this.preloadComplete = true
       this.launchBackground(store.getState().user.backgroundMode)
     })
   }
 
-  init() {
+  init(): void {
     this.network = new Network()
   }
 
@@ -83,7 +94,7 @@ export default class Bootstrap extends Phaser.Scene {
     this.scene.launch('background', { backgroundMode })
   }
 
-  launchGame() {
+  launchGame(): void {
     if (!this.preloadComplete) return
     this.scene.launch('game', {
       network: this.network,
@@ -93,7 +104,7 @@ export default class Bootstrap extends Phaser.Scene {
     store.dispatch(setRoomJoined(true))
   }
 
-  changeBackgroundMode(backgroundMode: BackgroundMode) {
+  changeBackgroundMode(backgroundMode: BackgroundMode): void {
     this.scene.stop('background')
     this.launchBackground(backgroundMode)
   }

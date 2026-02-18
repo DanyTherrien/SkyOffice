@@ -85,7 +85,7 @@ const PasswordDialog = styled(Dialog)`
   }
 `
 
-export const CustomRoomTable = () => {
+export const CustomRoomTable = (): JSX.Element => {
   const [password, setPassword] = useState('')
   const [selectedRoom, setSelectedRoom] = useState('')
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)

@@ -8,7 +8,7 @@ type Payload = {
 }
 
 export class WhiteboardAddUserCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, whiteboardId } = data
     const whiteboard = this.room.state.whiteboards.get(whiteboardId)
     const clientId = client.sessionId
@@ -19,7 +19,7 @@ export class WhiteboardAddUserCommand extends Command<IOfficeState, Payload> {
 }
 
 export class WhiteboardRemoveUserCommand extends Command<IOfficeState, Payload> {
-  execute(data: Payload) {
+  execute(data: Payload): void {
     const { client, whiteboardId } = data
     const whiteboard = this.state.whiteboards.get(whiteboardId)
 

@@ -9,14 +9,17 @@ import {
 
 export class Player extends Schema implements IPlayer {
   @type('string') name = ''
-  @type('number') x = 656
-  @type('number') y = 496
+  @type('number') x = 192
+  @type('number') y = 144
   @type('string') anim = 'adam_idle_down'
   @type('boolean') readyToConnect = false
   @type('boolean') videoConnected = false
   @type('string') zone = 'brainstorm'
   @type('string') role = ''
   @type('string') status = 'available'
+  @type('string') afkReason = ''
+  @type('string') salesStatus = ''  // 'on_call' | 'available' | 'preparing' | ''
+  @type('string') observingTarget = ''  // sessionId du joueur observe (vide si pas en observation)
 }
 
 export class Computer extends Schema implements IComputer {

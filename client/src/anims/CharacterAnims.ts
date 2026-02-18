@@ -5,7 +5,7 @@ import { AVATARS } from '../characters/avatarConfig'
  * Cree les animations (idle, run, sit) pour tous les avatars du registre.
  * Chaque avatar utilise le meme layout de spritesheet (52 frames, 32x48).
  */
-export const createCharacterAnims = (anims: Phaser.Animations.AnimationManager) => {
+export const createCharacterAnims = (anims: Phaser.Animations.AnimationManager): void => {
   const animsFrameRate = 15
 
   for (const avatar of AVATARS) {

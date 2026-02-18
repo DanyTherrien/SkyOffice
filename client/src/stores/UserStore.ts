@@ -5,7 +5,7 @@ import { BackgroundMode } from '../../../types/BackgroundMode'
 import phaserGame from '../PhaserGame'
 import Bootstrap from '../scenes/Bootstrap'
 
-export function getInitialBackgroundMode() {
+export function getInitialBackgroundMode(): BackgroundMode {
   const currentHour = new Date().getHours()
   return currentHour > 6 && currentHour <= 18 ? BackgroundMode.DAY : BackgroundMode.NIGHT
 }
@@ -21,7 +21,12 @@ export const userSlice = createSlice({
     playerZoneMap: new Map<string, string>(),
     playerRoleMap: new Map<string, string>(),
     playerStatusMap: new Map<string, string>(),
+    playerAfkReasonMap: new Map<string, string>(),
+    playerSalesStatusMap: new Map<string, string>(),
+    playerJoinTimeMap: new Map<string, number>(),
     showJoystick: window.innerWidth < 650,
+    // 3B — Profil joueur popover
+    profilePlayerId: null as string | null,
   },
   reducers: {
     toggleBackgroundMode: (state) => {
@@ -65,8 +70,31 @@ export const userSlice = createSlice({
     removePlayerStatusMap: (state, action: PayloadAction<string>) => {
       state.playerStatusMap.delete(sanitizeId(action.payload))
     },
+    setPlayerAfkReasonMap: (state, action: PayloadAction<{ id: string; reason: string }>) => {
+      state.playerAfkReasonMap.set(sanitizeId(action.payload.id), action.payload.reason)
+    },
+    removePlayerAfkReasonMap: (state, action: PayloadAction<string>) => {
+      state.playerAfkReasonMap.delete(sanitizeId(action.payload))
+    },
+    setPlayerSalesStatusMap: (state, action: PayloadAction<{ id: string; salesStatus: string }>) => {
+      state.playerSalesStatusMap.set(sanitizeId(action.payload.id), action.payload.salesStatus)
+    },
+    removePlayerSalesStatusMap: (state, action: PayloadAction<string>) => {
+      state.playerSalesStatusMap.delete(sanitizeId(action.payload))
+    },
     setShowJoystick: (state, action: PayloadAction<boolean>) => {
       state.showJoystick = action.payload
+    },
+    // 3B — Ouvrir/fermer le profil joueur
+    setProfilePlayerId: (state, action: PayloadAction<string | null>) => {
+      state.profilePlayerId = action.payload
+    },
+    // 3D — Tracker le moment ou un joueur rejoint
+    setPlayerJoinTime: (state, action: PayloadAction<{ id: string; time: number }>) => {
+      state.playerJoinTimeMap.set(sanitizeId(action.payload.id), action.payload.time)
+    },
+    removePlayerJoinTime: (state, action: PayloadAction<string>) => {
+      state.playerJoinTimeMap.delete(sanitizeId(action.payload))
     },
   },
 })
@@ -84,7 +112,14 @@ export const {
   removePlayerRoleMap,
   setPlayerStatusMap,
   removePlayerStatusMap,
+  setPlayerAfkReasonMap,
+  removePlayerAfkReasonMap,
+  setPlayerSalesStatusMap,
+  removePlayerSalesStatusMap,
   setShowJoystick,
+  setProfilePlayerId,
+  setPlayerJoinTime,
+  removePlayerJoinTime,
 } = userSlice.actions
 
 export default userSlice.reducer

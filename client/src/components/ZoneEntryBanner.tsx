@@ -46,7 +46,7 @@ const KeyHint = styled.span`
   margin: 0 2px;
 `
 
-export default function ZoneEntryBanner() {
+export default function ZoneEntryBanner(): JSX.Element | null {
   const dispatch = useAppDispatch()
   const show = useAppSelector((state) => state.meeting.showZoneEntryBanner)
   const zoneName = useAppSelector((state) => state.meeting.bannerZoneName)
