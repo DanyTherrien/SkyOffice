@@ -72,10 +72,6 @@ export default class Computer extends Item {
   addCurrentUser(userId: string): void {
     if (!this.currentUsers || this.currentUsers.has(userId)) return
     this.currentUsers.add(userId)
-    const computerState = store.getState().computer
-    if (computerState.computerId === this.id) {
-      computerState.shareScreenManager?.onUserJoined(userId)
-    }
     this.updateStatus()
     if (this.currentUsers.size === 1) this.startGlow()
   }
@@ -83,10 +79,6 @@ export default class Computer extends Item {
   removeCurrentUser(userId: string): void {
     if (!this.currentUsers || !this.currentUsers.has(userId)) return
     this.currentUsers.delete(userId)
-    const computerState = store.getState().computer
-    if (computerState.computerId === this.id) {
-      computerState.shareScreenManager?.onUserLeft(userId)
-    }
     this.updateStatus()
     if (this.currentUsers.size === 0) this.stopGlow()
   }

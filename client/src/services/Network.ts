@@ -378,10 +378,10 @@ export default class Network {
       phaserEvents.emit(Event.UPDATE_DIALOG_BUBBLE, clientId, content)
     })
 
-    // when a computer user stops sharing screen
-    this.room.onMessage(Message.STOP_SCREEN_SHARE, (clientId: string) => {
-      const computerState = store.getState().computer
-      computerState.shareScreenManager?.onUserLeft(clientId)
+    // when a computer user stops sharing screen (no-op: peer streaming removed, zone LiveKit handles this)
+    this.room.onMessage(Message.STOP_SCREEN_SHARE, (_clientId: string) => {
+      // Anciennement: shareScreenManager.onUserLeft(clientId) via PeerJS
+      // Le partage d'ecran de zone est maintenant gere par LiveKit
     })
 
     // Quand le serveur envoie une mise a jour des membres de zone
