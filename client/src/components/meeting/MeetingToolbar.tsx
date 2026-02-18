@@ -21,6 +21,7 @@ import { toggleMic, toggleCamera, setOverlayMinimized, setShowLeaveConfirmDialog
 import { startRecording as startRecordingAction, stopRecording as stopRecordingAction } from '../../stores/RecordingStore'
 import { togglePanel } from '../../stores/MeetingToolsStore'
 import { openMediaSettings } from '../../stores/MediaSettingsStore'
+import { liveKitService } from '../../web/LiveKitService'
 import phaserGame from '../../PhaserGame'
 import Game from '../../scenes/Game'
 import recordingManager from '../../services/RecordingManager'
@@ -145,37 +146,28 @@ export default function MeetingToolbar(): JSX.Element {
     }
   }, [isLocalRecording, recordingStartTime])
 
-  /** Obtient le ZoneMeetingManager via l'instance Phaser */
-  const getManager = () => {
-    const game = phaserGame.scene.keys.game as Game
-    return game.network.zoneMeetingManager
-  }
-
   /** Obtient le Network via l'instance Phaser */
   const getNetwork = () => {
     const game = phaserGame.scene.keys.game as Game
     return game.network
   }
 
-  /** Bascule le micro: dispatch Redux + appel manager */
+  /** Bascule le micro via LiveKit */
   const handleToggleMic = () => {
-    dispatch(toggleMic())
-    getManager()?.toggleMic()
+    liveKitService.toggleMicrophone()
   }
 
-  /** Bascule la camera: dispatch Redux + appel manager */
+  /** Bascule la camera via LiveKit */
   const handleToggleCamera = () => {
-    dispatch(toggleCamera())
-    getManager()?.toggleCamera()
+    liveKitService.toggleCamera()
   }
 
-  /** Demarre ou arrete le partage d'ecran */
+  /** Demarre ou arrete le partage d'ecran via LiveKit */
   const handleToggleScreenShare = () => {
-    const manager = getManager()
     if (isScreenSharing) {
-      manager?.stopScreenShare()
+      liveKitService.stopScreenShare()
     } else {
-      manager?.startScreenShare()
+      liveKitService.startScreenShare()
     }
   }
 

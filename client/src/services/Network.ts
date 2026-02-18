@@ -3,7 +3,7 @@ import { IComputer, IOfficeState, IPlayer, IWhiteboard } from '../../../types/IO
 import { Message } from '../../../types/Messages'
 import { IRoomData, RoomType } from '../../../types/Rooms'
 import { ItemType } from '../../../types/Items'
-import ZoneMeetingManager from '../web/ZoneMeetingManager'
+import { liveKitService } from '../web/LiveKitService'
 import { phaserEvents, Event } from '../events/EventCenter'
 import store from '../stores'
 import {
@@ -48,6 +48,7 @@ import {
   notifyPlayerJoinedOffice,
   notifyPlayerLeftOffice,
 } from '../web/notificationService'
+import { setZoneMemberIds, removePeerScreenStream } from '../stores/MeetingStore'
 import { setWhiteboardUrls } from '../stores/WhiteboardStore'
 import { pushToast } from '../stores/ToastStore'
 import { addDeferredMessage } from '../stores/DeferredMessageStore'
@@ -71,7 +72,6 @@ export default class Network {
   private client: Client
   private room?: Room<IOfficeState>
   private lobby!: Room
-  zoneMeetingManager?: ZoneMeetingManager
 
   mySessionId!: string
 
@@ -141,8 +141,8 @@ export default class Network {
     this.lobby.leave()
     this.mySessionId = this.room.sessionId
     store.dispatch(setSessionId(this.room.sessionId))
-    // Creer le gestionnaire de reunions par zone
-    this.zoneMeetingManager = new ZoneMeetingManager(this.mySessionId, (type, data) => {
+    // Configurer le service LiveKit pour qu'il puisse envoyer des messages Colyseus
+    liveKitService.setMessageSender((type, data) => {
       this.room?.send(type, data)
     })
 
@@ -386,7 +386,7 @@ export default class Network {
 
     // Quand le serveur envoie une mise a jour des membres de zone
     this.room.onMessage(Message.ZONE_MEMBERS_UPDATE, (data: { zone: string; memberIds: string[] }) => {
-      this.zoneMeetingManager?.onZoneMembersChanged(data.memberIds)
+      store.dispatch(setZoneMemberIds(data.memberIds))
     })
 
     // Quand un joueur de la meme zone envoie un message chat (dialog bubble seulement, le message Redux est gere par chatMessages.onAdd)
@@ -405,7 +405,16 @@ export default class Network {
 
     // Quand un joueur de la meme zone arrete son partage d'ecran
     this.room.onMessage(Message.ZONE_SCREEN_SHARE_STOPPED, (clientId: string) => {
-      this.zoneMeetingManager?.onPeerScreenShareStopped(clientId)
+      store.dispatch(removePeerScreenStream(clientId))
+    })
+
+    // Quand le serveur envoie un token LiveKit pour rejoindre une reunion de zone
+    this.room.onMessage(Message.LIVEKIT_TOKEN, async (message: { token: string; zone: string }) => {
+      try {
+        await liveKitService.connect(message.token, message.zone)
+      } catch (err) {
+        console.error('Erreur connexion LiveKit:', err)
+      }
     })
 
     // Quand le serveur refuse l'entree dans une zone pleine (one_on_one max 2)
@@ -752,6 +761,11 @@ export default class Network {
   // Envoyer un message de chat scope a la zone actuelle
   addZoneChatMessage(content: string): void {
     this.room?.send(Message.ADD_ZONE_CHAT_MESSAGE, { content })
+  }
+
+  // Demander un token LiveKit au serveur pour rejoindre une reunion de zone
+  requestLiveKitToken(zone: string): void {
+    this.room?.send(Message.REQUEST_LIVEKIT_TOKEN, { zone })
   }
 
   // Envoyer le changement de zone au serveur

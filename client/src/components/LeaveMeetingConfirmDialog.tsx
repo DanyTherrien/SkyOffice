@@ -8,8 +8,7 @@ import Button from '@mui/material/Button'
 
 import { useAppSelector, useAppDispatch } from '../hooks'
 import { setShowLeaveConfirmDialog, setOverlayOpen } from '../stores/MeetingStore'
-import phaserGame from '../PhaserGame'
-import Game from '../scenes/Game'
+import { liveKitService } from '../web/LiveKitService'
 
 const zoneNames: Record<string, string> = {
   brainstorm: 'Remue-meninges',
@@ -32,8 +31,7 @@ export default function LeaveMeetingConfirmDialog(): JSX.Element {
   const handleLeave = () => {
     dispatch(setShowLeaveConfirmDialog(false))
     dispatch(setOverlayOpen(false))
-    const game = phaserGame.scene.keys.game as Game
-    game.network.zoneMeetingManager?.leaveZone()
+    liveKitService.disconnect()
   }
 
   return (

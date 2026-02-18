@@ -34,6 +34,7 @@ import {
   setDesktopPermissionAsked,
 } from '../stores/NotificationStore'
 import { requestDesktopPermission } from '../web/notificationService'
+import { liveKitService } from '../web/LiveKitService'
 import phaserGame from '../PhaserGame'
 import Game from '../scenes/Game'
 import type { AudioPrefs } from '../scenes/AudioManager'
@@ -331,13 +332,12 @@ export default function MediaSettingsDialog(): JSX.Element | null {
     stopPreview()
     dispatch(closeMediaSettings())
 
-    // Appliquer au ZoneMeetingManager si en reunion
+    // Appliquer au service LiveKit si en reunion
     if (activeZone && activeZone !== 'deep_work') {
       try {
-        const game = phaserGame.scene.keys.game as Game
-        game.network.zoneMeetingManager?.applyMediaSettings()
+        liveKitService.applyMediaSettings()
       } catch {
-        // Ignore si Phaser n'est pas pret
+        // Ignore si LiveKit n'est pas connecte
       }
     }
   }

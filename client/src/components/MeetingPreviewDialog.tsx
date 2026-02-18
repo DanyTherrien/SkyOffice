@@ -22,6 +22,7 @@ import { buildMediaConstraints } from '../web/mediaDevices'
 import { useAudioLevel } from '../hooks/useAudioLevel'
 import phaserGame from '../PhaserGame'
 import Game from '../scenes/Game'
+import { Message } from '../../../types/Messages'
 
 const zoneNames: Record<string, string> = {
   brainstorm: 'Remue-meninges',
@@ -215,8 +216,9 @@ export default function MeetingPreviewDialog(): JSX.Element | null {
     const zone = pendingZone
     dispatch(setPendingZone(null))
     if (zone) {
+      // Demander un token LiveKit au serveur pour rejoindre la reunion
       const game = phaserGame.scene.keys.game as Game
-      game.network.zoneMeetingManager?.joinZone(zone)
+      game.network.requestLiveKitToken(zone)
     }
   }
 
@@ -229,8 +231,9 @@ export default function MeetingPreviewDialog(): JSX.Element | null {
     const zone = pendingZone
     dispatch(setPendingZone(null))
     if (zone) {
+      // Demander un token LiveKit au serveur pour rejoindre la reunion
       const game = phaserGame.scene.keys.game as Game
-      game.network.zoneMeetingManager?.joinZone(zone)
+      game.network.requestLiveKitToken(zone)
     }
   }
 

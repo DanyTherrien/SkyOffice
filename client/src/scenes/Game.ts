@@ -31,6 +31,7 @@ import { pushToast } from '../stores/ToastStore'
 import { NavKeys, Keyboard } from '../../../types/KeyboardState'
 import { sanitizeId } from '../util'
 import { ZONE_NAMES, MEETING_ZONES } from '../constants'
+import { liveKitService } from '../web/LiveKitService'
 import LightingManager from './LightingManager'
 import ZoneParticleManager from './ZoneParticleManager'
 import AudioManager, { SFX } from './AudioManager'
@@ -513,52 +514,62 @@ export default class Game extends Phaser.Scene {
     return group
   }
 
-  // ─── Murs visibles entre les salles ──────────────────────────────────────
+  // ─── Murs visibles entre les salles (32px d'epaisseur) ───────────────────
   private drawRoomWalls() {
     const wallColor = 0x1a1a2e
-    const wallAlpha = 0.85
-    const borderColor = 0x334155
+    const wallAlpha = 0.75
     const doorColor = 0x14b8a6
 
     const gfx = this.add.graphics().setDepth(997)
 
-    // Segments de murs (memes positions que les zones de collision, sans les portes)
+    // Segments de murs 32px (centres sur x=384 et y=288)
     const wallRects = [
-      // Mur vertical: brainstorm↔meeting
-      [352, 32, 64, 96],   // au-dessus de la porte A
-      [352, 160, 64, 96],  // en-dessous de la porte A
-      // Mur vertical: deep_work↔sales
-      [352, 320, 64, 96],  // au-dessus de la porte B
-      [352, 448, 64, 96],  // en-dessous de la porte B
-      // Mur horizontal: brainstorm↔deep_work
-      [32, 256, 144, 64],  // a gauche de la porte C
-      [208, 256, 144, 64], // a droite de la porte C
-      // Mur horizontal: meeting↔sales
-      [416, 256, 144, 64], // a gauche de la porte D
-      [592, 256, 144, 64], // a droite de la porte D
-      // Intersection centrale
-      [352, 256, 64, 64],
+      // Mur vertical A: brainstorm↔meeting (demi-haut)
+      [368, 32, 32, 96],    // au-dessus porte A: y=32..128
+      [368, 160, 32, 112],  // sous porte A → mur horiz: y=160..272
+      // Mur vertical B: deep_work↔sales (demi-bas)
+      [368, 304, 32, 112],  // du mur horiz → porte B: y=304..416
+      [368, 448, 32, 96],   // sous porte B: y=448..544
+      // Mur vertical E: meeting↔one_on_one (demi-haut)
+      [492, 32, 32, 96],    // au-dessus porte E: y=32..128
+      [492, 160, 32, 112],  // sous porte E → mur horiz: y=160..272
+      // Mur vertical F: sales↔afk (demi-bas)
+      [492, 304, 32, 112],  // du mur horiz → porte F: y=304..416
+      [492, 448, 32, 96],   // sous porte F: y=448..544
+      // Mur horizontal C: brainstorm↔deep_work (gauche)
+      [32, 272, 144, 32],   // gauche porte C: x=32..176
+      [208, 272, 160, 32],  // droite porte C → mur vert A: x=208..368
+      // Mur horizontal D1: meeting↔sales (centre)
+      [400, 272, 48, 32],   // mur vert A → porte D1: x=400..448
+      [480, 272, 12, 32],   // porte D1 → mur vert E: x=480..492
+      // Mur horizontal D2: one_on_one↔afk (droite)
+      [524, 272, 36, 32],   // mur vert E → porte D2: x=524..560
+      [592, 272, 144, 32],  // droite porte D2: x=592..736
+      // Intersections
+      [368, 272, 32, 32],   // intersection A/B × C/D
+      [492, 272, 32, 32],   // intersection E/F × D1/D2
     ]
 
     for (const [x, y, w, h] of wallRects) {
       gfx.fillStyle(wallColor, wallAlpha)
-      gfx.fillRect(x, y, w, h)
-      gfx.lineStyle(1, borderColor, 0.5)
-      gfx.strokeRect(x, y, w, h)
+      gfx.fillRoundedRect(x, y, w, h, 3)
     }
 
     // Ouvertures de portes — surlignage subtil
     const doorGaps = [
-      [352, 128, 64, 32],  // porte A
-      [352, 416, 64, 32],  // porte B
-      [176, 256, 32, 64],  // porte C
-      [560, 256, 32, 64],  // porte D
+      [368, 128, 32, 32],  // porte A (brainstorm↔meeting)
+      [368, 416, 32, 32],  // porte B (deep_work↔sales)
+      [176, 272, 32, 32],  // porte C (brainstorm↔deep_work)
+      [448, 272, 32, 32],  // porte D1 (meeting↔sales)
+      [492, 128, 32, 32],  // porte E (meeting↔one_on_one)
+      [492, 416, 32, 32],  // porte F (sales↔afk)
+      [560, 272, 32, 32],  // porte D2 (one_on_one↔afk)
     ]
     for (const [x, y, w, h] of doorGaps) {
-      gfx.fillStyle(doorColor, 0.12)
-      gfx.fillRect(x, y, w, h)
-      gfx.lineStyle(1, doorColor, 0.3)
-      gfx.strokeRect(x, y, w, h)
+      gfx.fillStyle(doorColor, 0.15)
+      gfx.fillRoundedRect(x, y, w, h, 3)
+      gfx.lineStyle(1, doorColor, 0.25)
+      gfx.strokeRoundedRect(x, y, w, h, 3)
     }
   }
 
@@ -574,28 +585,44 @@ export default class Game extends Phaser.Scene {
       return zone
     }
 
-    // Mur A (vertical): entre brainstorm et meeting — x=352..416, y=32..256
-    // Porte au centre a y=128..160 (gap de 32px)
-    addWallRect(352, 32, 64, 96)   // au-dessus de la porte: y=32..128
-    addWallRect(352, 160, 64, 96)  // en-dessous de la porte: y=160..256
+    // Mur A (vertical): brainstorm↔meeting — x=368..400, y=32..272
+    // Porte A au centre a y=128..160
+    addWallRect(368, 32, 32, 96)    // au-dessus de la porte: y=32..128
+    addWallRect(368, 160, 32, 112)  // en-dessous de la porte: y=160..272
 
-    // Mur B (vertical): entre deep_work et sales — x=352..416, y=320..544
-    // Porte au centre a y=416..448
-    addWallRect(352, 320, 64, 96)  // au-dessus de la porte: y=320..416
-    addWallRect(352, 448, 64, 96)  // en-dessous de la porte: y=448..544
+    // Mur B (vertical): deep_work↔sales — x=368..400, y=304..544
+    // Porte B au centre a y=416..448
+    addWallRect(368, 304, 32, 112)  // au-dessus de la porte: y=304..416
+    addWallRect(368, 448, 32, 96)   // en-dessous de la porte: y=448..544
 
-    // Mur C (horizontal): entre brainstorm et deep_work — x=32..352, y=256..320
-    // Porte au centre a x=176..208
-    addWallRect(32, 256, 144, 64)  // a gauche de la porte: x=32..176
-    addWallRect(208, 256, 144, 64) // a droite de la porte: x=208..352
+    // Mur E (vertical): meeting↔one_on_one — x=492..524, y=32..272
+    // Porte E au centre a y=128..160
+    addWallRect(492, 32, 32, 96)    // au-dessus de la porte: y=32..128
+    addWallRect(492, 160, 32, 112)  // en-dessous de la porte: y=160..272
 
-    // Mur D (horizontal): entre meeting et sales — x=416..736, y=256..320
-    // Porte au centre a x=560..592
-    addWallRect(416, 256, 144, 64) // a gauche de la porte: x=416..560
-    addWallRect(592, 256, 144, 64) // a droite de la porte: x=592..736
+    // Mur F (vertical): sales↔afk — x=492..524, y=304..544
+    // Porte F au centre a y=416..448
+    addWallRect(492, 304, 32, 112)  // au-dessus de la porte: y=304..416
+    addWallRect(492, 448, 32, 96)   // en-dessous de la porte: y=448..544
 
-    // Bloc central: intersection x=352..416, y=256..320 (entierement bloque)
-    addWallRect(352, 256, 64, 64)
+    // Mur C (horizontal): brainstorm↔deep_work — x=32..368, y=272..304
+    // Porte C au centre a x=176..208
+    addWallRect(32, 272, 144, 32)   // a gauche de la porte: x=32..176
+    addWallRect(208, 272, 160, 32)  // a droite de la porte: x=208..368
+
+    // Mur D1 (horizontal): meeting↔sales — x=400..492, y=272..304
+    // Porte D1 au centre a x=448..480
+    addWallRect(400, 272, 48, 32)   // a gauche de la porte: x=400..448
+    addWallRect(480, 272, 12, 32)   // a droite de la porte: x=480..492
+
+    // Mur D2 (horizontal): one_on_one↔afk — x=524..736, y=272..304
+    // Porte D2 au centre a x=560..592
+    addWallRect(524, 272, 36, 32)   // a gauche de la porte: x=524..560
+    addWallRect(592, 272, 144, 32)  // a droite de la porte: x=592..736
+
+    // Intersections: murs verticaux × horizontaux
+    addWallRect(368, 272, 32, 32)   // intersection A/B × C/D1
+    addWallRect(492, 272, 32, 32)   // intersection E/F × D1/D2
 
     // Ajouter les colliders pour tous les murs
     for (const wz of wallZones) {
@@ -608,16 +635,25 @@ export default class Game extends Phaser.Scene {
     const doorDefs = [
       // Porte A: brainstorm ↔ meeting (mur vertical)
       { x: 384, y: 144, orientation: 'vertical' as const,
-        sideA: { x: 344, y: 144 }, sideB: { x: 424, y: 144 } },
+        sideA: { x: 360, y: 144 }, sideB: { x: 408, y: 144 } },
       // Porte B: deep_work ↔ sales (mur vertical)
       { x: 384, y: 432, orientation: 'vertical' as const,
-        sideA: { x: 344, y: 432 }, sideB: { x: 424, y: 432 } },
+        sideA: { x: 360, y: 432 }, sideB: { x: 408, y: 432 } },
       // Porte C: brainstorm ↔ deep_work (mur horizontal)
       { x: 192, y: 288, orientation: 'horizontal' as const,
-        sideA: { x: 192, y: 248 }, sideB: { x: 192, y: 328 } },
-      // Porte D: meeting ↔ sales (mur horizontal)
+        sideA: { x: 192, y: 264 }, sideB: { x: 192, y: 312 } },
+      // Porte D1: meeting ↔ sales (mur horizontal, cote meeting)
+      { x: 464, y: 288, orientation: 'horizontal' as const,
+        sideA: { x: 464, y: 264 }, sideB: { x: 464, y: 312 } },
+      // Porte D2: one_on_one ↔ afk (mur horizontal, cote one_on_one)
       { x: 576, y: 288, orientation: 'horizontal' as const,
-        sideA: { x: 576, y: 248 }, sideB: { x: 576, y: 328 } },
+        sideA: { x: 576, y: 264 }, sideB: { x: 576, y: 312 } },
+      // Porte E: meeting ↔ one_on_one (mur vertical)
+      { x: 508, y: 144, orientation: 'vertical' as const,
+        sideA: { x: 484, y: 144 }, sideB: { x: 532, y: 144 } },
+      // Porte F: sales ↔ afk (mur vertical)
+      { x: 508, y: 432, orientation: 'vertical' as const,
+        sideA: { x: 484, y: 432 }, sideB: { x: 532, y: 432 } },
     ]
 
     for (const def of doorDefs) {
@@ -745,8 +781,8 @@ export default class Game extends Phaser.Scene {
     this.clearZoneEntryTimer()
     this.zoneEntryTimer = setTimeout(() => {
       this.zoneEntryTimer = null
-      // Rejoindre automatiquement la reunion de zone
-      this.network.zoneMeetingManager?.joinZone(zoneName)
+      // Demander un token LiveKit au serveur pour rejoindre la reunion de zone
+      this.network.requestLiveKitToken(zoneName)
       // 6.5 — Camera shake subtil au demarrage de la reunion
       this.cameras.main.shake(100, 0.002)
       // Auto-join reunion de zone
@@ -907,7 +943,7 @@ export default class Game extends Phaser.Scene {
             if (name === 'deep_work' || name === 'afk') {
               // Activer le mode file d'attente des messages
               store.dispatch(startQueuing())
-              this.network.zoneMeetingManager?.leaveZone()
+              liveKitService.disconnect()
             } else {
               // Desactiver le mode file d'attente (le resume sera affiche par React)
               const wasQueuing = store.getState().deferredMessage.isQueuing
@@ -917,7 +953,7 @@ export default class Game extends Phaser.Scene {
               // Si deja en meeting actif, changer de zone directement
               const meetingState = store.getState().meeting
               if (meetingState.activeZone) {
-                this.network.zoneMeetingManager?.joinZone(name)
+                this.network.requestLiveKitToken(name)
               } else {
                 // Grace period de 1.5s avant d'afficher la banniere
                 this.startZoneEntryGracePeriod(name)

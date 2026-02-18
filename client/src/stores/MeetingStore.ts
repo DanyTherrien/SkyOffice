@@ -95,6 +95,14 @@ export const meetingSlice = createSlice({
     toggleCamera: (state) => {
       state.cameraEnabled = !state.cameraEnabled
     },
+    // Definit explicitement l'etat du micro (pour sync LiveKit)
+    setMicEnabled: (state, action: PayloadAction<boolean>) => {
+      state.micEnabled = action.payload
+    },
+    // Definit explicitement l'etat de la camera (pour sync LiveKit)
+    setCameraEnabled: (state, action: PayloadAction<boolean>) => {
+      state.cameraEnabled = action.payload
+    },
     // Ajoute le stream video (webcam) d'un pair
     addPeerVideoStream: (
       state,
@@ -208,6 +216,8 @@ export const {
   setMyScreenStream,
   toggleMic,
   toggleCamera,
+  setMicEnabled,
+  setCameraEnabled,
   addPeerVideoStream,
   removePeerVideoStream,
   addPeerScreenStream,
